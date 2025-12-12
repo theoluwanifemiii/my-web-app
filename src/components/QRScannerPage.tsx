@@ -1,25 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { QrCode } from 'lucide-react';
-
-interface RegistrationData {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  church: string;
-  zone: string;
-  ticketType: 'solo' | 'guest';
-  guestName?: string;
-  totalDue: number;
-  totalPaid: number;
-  balance: number;
-  paymentMethod: 'cash' | 'transfer' | null;
-  status: 'paid' | 'pending';
-  transactionRef?: string;
-  receiptImage?: string | null;
-  createdAt: string;
-  checkedIn?: boolean;
-}
+import type { RegistrationData } from './RegistrationPage'; // Add this line
 
 interface QRScannerPageProps {
   registrations: RegistrationData[];

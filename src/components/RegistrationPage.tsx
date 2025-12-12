@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 
-interface RegistrationData {
+export interface RegistrationData {
   id: string;
   name: string;
   phone: string;
@@ -18,6 +18,7 @@ interface RegistrationData {
   transactionRef?: string;
   receiptImage?: string | null;
   createdAt: string;
+  checkedIn?: boolean;
 }
 
 interface RegistrationPageProps {
@@ -131,15 +132,35 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
   // Success screen
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Registration Successful!</h2>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-transparent to-blue-500/10"></div>
+        
+        <div className="relative bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border border-gray-100 animate-in zoom-in duration-300">
+          <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30">
+            <CheckCircle className="w-12 h-12 text-white" strokeWidth={2.5} />
+          </div>
+          
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">Success! 🎉</h2>
+          
           {paymentMethod === 'transfer' ? (
-            <p className="text-gray-600">Your ticket will be active once we verify the transfer.</p>
+            <>
+              <p className="text-gray-600 mb-2">Your registration has been received!</p>
+              <p className="text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                ⏳ Your ticket will be activated once we verify your payment
+              </p>
+            </>
           ) : (
-            <p className="text-gray-600">Your payment has been confirmed. See you at the event!</p>
+            <>
+              <p className="text-gray-600 mb-2">Your payment has been confirmed!</p>
+              <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl p-3">
+                ✓ You're all set! See you at the event
+              </p>
+            </>
           )}
+          
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-xs text-gray-500">Check your email for confirmation</p>
+          </div>
         </div>
       </div>
     );
@@ -148,51 +169,112 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
   // Payment step
   if (paymentStep) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
-          <h2 className="text-xl font-bold mb-4">Payment Step</h2>
-          <p className="mb-2">Ticket Price: ₦{ticketPrice}</p>
-          <div className="mb-4">
-            <label className="mr-4">
-              <input type="radio" name="payment" value="cash" onChange={() => setPaymentMethod('cash')} checked={paymentMethod === 'cash'} /> Cash
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10"></div>
+        
+        <div className="relative bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 max-w-md w-full border border-gray-100">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Payment</h2>
+            <p className="text-3xl font-bold text-purple-600">₦{ticketPrice.toLocaleString()}</p>
+          </div>
+
+          <div className="space-y-3 mb-6">
+            <label className="flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all hover:border-purple-500 hover:bg-purple-50/50">
+              <input 
+                type="radio" 
+                name="payment" 
+                value="cash" 
+                onChange={() => setPaymentMethod('cash')} 
+                checked={paymentMethod === 'cash'}
+                className="w-5 h-5 text-purple-600"
+              />
+              <span className="ml-3 font-medium text-gray-700">💵 Cash Payment</span>
             </label>
-            <label>
-              <input type="radio" name="payment" value="transfer" onChange={() => setPaymentMethod('transfer')} checked={paymentMethod === 'transfer'} /> Transfer
+            
+            <label className="flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all hover:border-purple-500 hover:bg-purple-50/50">
+              <input 
+                type="radio" 
+                name="payment" 
+                value="transfer" 
+                onChange={() => setPaymentMethod('transfer')} 
+                checked={paymentMethod === 'transfer'}
+                className="w-5 h-5 text-purple-600"
+              />
+              <span className="ml-3 font-medium text-gray-700">🏦 Bank Transfer</span>
             </label>
           </div>
 
           {paymentMethod === 'cash' && (
-            <input
-              type="password"
-              placeholder="Staff PIN"
-              value={staffPin}
-              onChange={(e) => setStaffPin(e.target.value)}
-              className="border p-2 rounded w-full mb-4"
-            />
+            <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Staff PIN</label>
+              <input
+                type="password"
+                placeholder="Enter 4-digit PIN"
+                value={staffPin}
+                onChange={(e) => setStaffPin(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none"
+              />
+            </div>
           )}
 
           {paymentMethod === 'transfer' && (
-            <>
-              <input
-                type="text"
-                placeholder="Transaction Reference"
-                value={transactionRef}
-                onChange={(e) => setTransactionRef(e.target.value)}
-                className="border p-2 rounded w-full mb-4"
-              />
-              <input type="file" onChange={handleImageUpload} className="mb-4" />
-              {receiptImage && <img src={receiptImage} alt="Receipt Preview" className="mb-4 w-full max-h-40 object-contain" />}
-            </>
+            <div className="space-y-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Transaction Reference</label>
+                <input
+                  type="text"
+                  placeholder="Enter transaction reference"
+                  value={transactionRef}
+                  onChange={(e) => setTransactionRef(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Upload Receipt</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-purple-500 transition-colors">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleImageUpload} 
+                    className="hidden" 
+                    id="receipt-upload"
+                  />
+                  <label htmlFor="receipt-upload" className="cursor-pointer">
+                    {receiptImage ? (
+                      <img src={receiptImage} alt="Receipt Preview" className="max-h-40 mx-auto rounded-lg" />
+                    ) : (
+                      <div className="text-gray-500">
+                        <div className="text-4xl mb-2">📎</div>
+                        <p className="text-sm">Click to upload receipt</p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+            </div>
           )}
 
-          {error && <p className="text-red-500 mb-4">{error}</p>}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
 
-          <button onClick={handlePayment} className="bg-blue-600 text-white px-4 py-2 rounded mr-2">
-            Submit Payment
-          </button>
-          <button onClick={() => setPaymentStep(false)} className="bg-gray-300 px-4 py-2 rounded">
-            Back
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => { setPaymentStep(false); setError(''); }} 
+              className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all"
+            >
+              ← Back
+            </button>
+            <button 
+              onClick={handlePayment} 
+              className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transform hover:scale-[1.02] transition-all shadow-lg shadow-purple-500/30"
+            >
+              Submit Payment
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -200,73 +282,117 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
 
   // Registration form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
-        <h2 className="text-xl font-bold mb-4">Register for Event</h2>
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/20 via-transparent to-transparent"></div>
+      
+      <div className="relative bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 max-w-md w-full border border-gray-100">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Event Registration</h2>
+          <p className="text-gray-600 text-sm">Fill in your details to register</p>
+        </div>
 
-        <input
-          type="text"
-          placeholder="Name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="border p-2 rounded w-full mb-4"
-        />
-        <input
-          type="text"
-          placeholder="Phone"
-          value={formData.phone}
-          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-          className="border p-2 rounded w-full mb-4"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="border p-2 rounded w-full mb-4"
-        />
-        <input
-          type="text"
-          placeholder="Church"
-          value={formData.church}
-          onChange={(e) => setFormData({ ...formData, church: e.target.value })}
-          className="border p-2 rounded w-full mb-4"
-        />
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
+            <input
+              type="text"
+              placeholder="John Doe"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+            />
+          </div>
 
-        <select
-          value={formData.zone}
-          onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
-          className="border p-2 rounded w-full mb-4"
-        >
-          <option value="Akoka">Akoka</option>
-          <option value="Yaba">Yaba</option>
-          <option value="Ikeja">Ikeja</option>
-        </select>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number</label>
+            <input
+              type="tel"
+              placeholder="+234 800 000 0000"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+            />
+          </div>
 
-        <select
-          value={formData.ticketType}
-          onChange={(e) => setFormData({ ...formData, ticketType: e.target.value as 'solo' | 'guest' })}
-          className="border p-2 rounded w-full mb-4"
-        >
-          <option value="solo">Solo</option>
-          <option value="guest">Guest</option>
-        </select>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
+            <input
+              type="email"
+              placeholder="john@example.com"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+            />
+          </div>
 
-        {formData.ticketType === 'guest' && (
-          <input
-            type="text"
-            placeholder="Guest Name"
-            value={formData.guestName}
-            onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
-            className="border p-2 rounded w-full mb-4"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Church Name</label>
+            <input
+              type="text"
+              placeholder="Your Church"
+              value={formData.church}
+              onChange={(e) => setFormData({ ...formData, church: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Zone</label>
+            <select
+              value={formData.zone}
+              onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+            >
+              <option value="Akoka">Akoka</option>
+              <option value="Yaba">Yaba</option>
+              <option value="Ikeja">Ikeja</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Ticket Type</label>
+            <select
+              value={formData.ticketType}
+              onChange={(e) => setFormData({ ...formData, ticketType: e.target.value as 'solo' | 'guest' })}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+            >
+              <option value="solo">Solo Ticket - ₦2,000</option>
+              <option value="guest">With Guest - ₦3,000</option>
+            </select>
+          </div>
+
+          {formData.ticketType === 'guest' && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Guest Name</label>
+              <input
+                type="text"
+                placeholder="Guest Full Name"
+                value={formData.guestName}
+                onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+              />
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
         )}
 
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-
-        <button onClick={handleSubmit} className="bg-blue-600 text-white px-4 py-2 rounded w-full">
-          Continue to Payment
+        <button 
+          onClick={handleSubmit} 
+          className="mt-6 w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transform hover:scale-[1.02] transition-all shadow-lg shadow-purple-500/30"
+        >
+          Continue to Payment →
         </button>
+
+        <p className="text-center text-xs text-gray-500 mt-4">
+          Your information is secure and encrypted
+        </p>
       </div>
     </div>
   );

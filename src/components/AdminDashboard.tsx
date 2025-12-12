@@ -1,5 +1,5 @@
 import React from 'react';
-import { RegistrationData } from './RegistrationPage'; // reuse the type we defined earlier
+import type { RegistrationData } from './RegistrationPage'; // Add 'type' keyword
 
 interface AdminDashboardProps {
   registrations: RegistrationData[];
