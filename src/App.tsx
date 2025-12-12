@@ -1,13 +1,27 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import RegistrationPage, { type RegistrationData } from './components/RegistrationPage';
 import AdminDashboard from './components/AdminDashboard';
 import QRScannerPage from './components/QRScannerPage';
 import AdminLogin from './components/AdminLogin';
 
 function App() {
-  const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [registrations, setRegistrations] = useState<RegistrationData[]>(() => {
+    const saved = localStorage.getItem('registrations');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [isAdmin, setIsAdmin] = useState(() => {
+    return localStorage.getItem('isAdmin') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('registrations', JSON.stringify(registrations));
+  }, [registrations]);
+
+  useEffect(() => {
+    localStorage.setItem('isAdmin', isAdmin.toString());
+  }, [isAdmin]);
 
   const handleAddRegistration = (registration: RegistrationData) => {
     setRegistrations(prev => [...prev, registration]);
@@ -25,18 +39,17 @@ function App() {
 
   const handleLogout = () => {
     setIsAdmin(false);
+    localStorage.removeItem('isAdmin');
   };
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Registration Page */}
         <Route 
           path="/" 
           element={<RegistrationPage onRegister={handleAddRegistration} />} 
         />
         
-        {/* Admin Login Page */}
         <Route 
           path="/admin" 
           element={
@@ -48,7 +61,6 @@ function App() {
           } 
         />
         
-        {/* Admin Dashboard (Protected) */}
         <Route 
           path="/admin/dashboard" 
           element={
@@ -58,8 +70,8 @@ function App() {
                 onUpdateRegistration={handleUpdateRegistration}
                 onSendETicket={(id: string) => console.log('Send e-ticket to', id)}
                 onLogout={handleLogout}
-                onBackToRegister={() => window.location.href = '/'}
-                onOpenScanner={() => window.location.href = '/admin/scanner'}
+                onBackToRegister={() => {}}
+                onOpenScanner={() => {}}
               />
             ) : (
               <Navigate to="/admin" replace />
@@ -67,7 +79,6 @@ function App() {
           } 
         />
         
-        {/* QR Scanner Page (Protected) */}
         <Route 
           path="/admin/scanner" 
           element={
@@ -75,7 +86,7 @@ function App() {
               <QRScannerPage
                 registrations={registrations}
                 onUpdateRegistration={handleUpdateRegistration}
-                onBack={() => window.location.href = '/admin/dashboard'}
+                onBack={() => {}}
               />
             ) : (
               <Navigate to="/admin" replace />
@@ -83,7 +94,6 @@ function App() {
           } 
         />
 
-        {/* Catch all - redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { QrCode } from 'lucide-react';
-import type { RegistrationData } from './RegistrationPage'; // Add this line
+import { Link } from 'react-router-dom';
+import type { RegistrationData } from './RegistrationPage';
 
 interface QRScannerPageProps {
   registrations: RegistrationData[];
@@ -8,7 +9,7 @@ interface QRScannerPageProps {
   onBack: () => void;
 }
 
-export default function QRScannerPage({ registrations, onUpdateRegistration, onBack }: QRScannerPageProps) {
+export default function QRScannerPage({ registrations, onUpdateRegistration }: QRScannerPageProps) {
   const [scanResult, setScanResult] = useState<RegistrationData | null>(null);
   const [manualId, setManualId] = useState('');
   const [error, setError] = useState('');
@@ -50,48 +51,50 @@ export default function QRScannerPage({ registrations, onUpdateRegistration, onB
             placeholder="Enter Ticket ID manually"
             value={manualId}
             onChange={(e) => setManualId(e.target.value)}
-            className="border p-2 rounded w-full mb-4"
+            onKeyPress={(e) => e.key === 'Enter' && handleManualSearch()}
+            className="border p-3 rounded-xl w-full mb-4 focus:ring-2 focus:ring-purple-500 outline-none"
           />
           <button
             onClick={handleManualSearch}
-            className="bg-blue-600 text-white px-4 py-2 rounded w-full mb-2"
+            className="bg-blue-600 text-white px-4 py-3 rounded-xl w-full mb-2 hover:bg-blue-700 transition font-medium"
           >
             Search Ticket
           </button>
-          <button
-            onClick={onBack}
-            className="bg-gray-300 px-4 py-2 rounded w-full"
+          <Link
+            to="/admin/dashboard"
+            className="block text-center bg-gray-300 px-4 py-3 rounded-xl w-full hover:bg-gray-400 transition font-medium"
           >
-            Back
-          </button>
-          {error && <p className="text-red-500 mt-2">{error}</p>}
+            Back to Dashboard
+          </Link>
+          {error && <p className="text-red-500 mt-3 text-sm">{error}</p>}
         </div>
       )}
 
       {scanResult && (
         <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center">
           <h3 className="text-xl font-bold mb-2">{scanResult.name}</h3>
-          <p className="mb-1">Church: {scanResult.church}</p>
-          <p className="mb-1">Zone: {scanResult.zone}</p>
+          <p className="mb-1"><strong>Church:</strong> {scanResult.church}</p>
+          <p className="mb-1"><strong>Zone:</strong> {scanResult.zone}</p>
           <p className="mb-4">
-            Ticket: {scanResult.ticketType} {scanResult.guestName ? `with guest: ${scanResult.guestName}` : ''}
+            <strong>Ticket:</strong> {scanResult.ticketType} 
+            {scanResult.guestName && ` (Guest: ${scanResult.guestName})`}
           </p>
 
           {scanResult.checkedIn ? (
-            <p className="text-green-600 font-bold mb-4">Already Checked In</p>
+            <p className="text-green-600 font-bold mb-4 text-lg">✓ Already Checked In</p>
           ) : (
             <button
               onClick={handleCheckIn}
-              className="bg-green-600 text-white px-4 py-2 rounded w-full mb-2"
+              className="bg-green-600 text-white px-4 py-3 rounded-xl w-full mb-2 hover:bg-green-700 transition font-medium"
             >
-              Check In
+              Check In Now
             </button>
           )}
           <button
             onClick={() => { setScanResult(null); setManualId(''); setError(''); }}
-            className="bg-gray-300 px-4 py-2 rounded w-full"
+            className="bg-gray-300 px-4 py-3 rounded-xl w-full hover:bg-gray-400 transition font-medium"
           >
-            Back
+            Scan Another
           </button>
         </div>
       )}

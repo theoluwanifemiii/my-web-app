@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CheckCircle } from 'lucide-react';
+import { sendTicketEmail } from '../services/emailService';
 
 export interface RegistrationData {
   id: string;
@@ -81,26 +82,43 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
     }
 
     const registration: RegistrationData = {
-      id: Date.now().toString(),
-      name: formData.name,
-      phone: formData.phone,
-      email: formData.email,
-      church: formData.church,
-      zone: formData.zone,
-      ticketType: formData.ticketType,
-      guestName: formData.ticketType === 'guest' ? formData.guestName : undefined,
-      totalDue: ticketPrice,
-      totalPaid: paymentMethod === 'cash' ? ticketPrice : 0,
-      balance: paymentMethod === 'cash' ? 0 : ticketPrice,
-      paymentMethod,
-      status: paymentMethod === 'cash' ? 'paid' : 'pending',
-      transactionRef: paymentMethod === 'transfer' ? transactionRef : undefined,
-      receiptImage: paymentMethod === 'transfer' ? receiptImage : undefined,
-      createdAt: new Date().toISOString(),
-    };
+  id: Date.now().toString(),
+  name: formData.name,
+  phone: formData.phone,
+  email: formData.email,
+  church: formData.church,
+  zone: formData.zone,
+  ticketType: formData.ticketType,
+  guestName: formData.ticketType === 'guest' ? formData.guestName : undefined,
+  totalDue: ticketPrice,
+  totalPaid: paymentMethod === 'cash' ? ticketPrice : 0,
+  balance: paymentMethod === 'cash' ? 0 : ticketPrice,
+  paymentMethod,
+  status: paymentMethod === 'cash' ? 'paid' : 'pending',
+  transactionRef: paymentMethod === 'transfer' ? transactionRef : undefined,
+  receiptImage: paymentMethod === 'transfer' ? receiptImage : undefined,
+  createdAt: new Date().toISOString(),
+};
 
-    onRegister(registration);
-    setShowSuccess(true);
+onRegister(registration);
+
+// Send confirmation email
+try {
+  await sendTicketEmail({
+    to: registration.email,
+    name: registration.name,
+    ticketId: registration.id,
+    church: registration.church,
+    zone: registration.zone,
+    ticketType: registration.ticketType,
+    guestName: registration.guestName
+  });
+  console.log('✅ Email sent successfully');
+} catch (error) {
+  console.error('❌ Email failed:', error);
+}
+
+setShowSuccess(true);
 
     setTimeout(() => {
       setShowSuccess(false);
