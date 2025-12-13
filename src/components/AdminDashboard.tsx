@@ -24,14 +24,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleApprove = (reg: RegistrationData) => {
-    onUpdateRegistration(reg.id, {
-      status: 'paid',
-      totalPaid: reg.totalDue,
-      balance: 0,
-    });
-  };
+ const handleApprove = (reg: RegistrationData) => {
+  // Generate QR code
+  const qrData = JSON.stringify({
+    id: reg.id,
+    name: reg.name,
+    ticketType: reg.ticketType,
+    guestName: reg.guestName,
+  });
+  const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
 
+  // Update with payment approval + ticket
+  onUpdateRegistration(reg.id, {
+    status: 'paid',
+    totalPaid: reg.totalDue,
+    balance: 0,
+    ticketQR: qrCode,
+    ticketGenerated: true,
+  });
+};
   const handleSendETicket = (id: string) => {
     setSendingEmail(id);
     onSendETicket(id);

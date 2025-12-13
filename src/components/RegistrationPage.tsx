@@ -20,6 +20,8 @@ export interface RegistrationData {
   receiptImage?: string | null;
   createdAt: string;
   checkedIn?: boolean;
+  ticketQR?: string;           
+  ticketGenerated?: boolean;   
 }
 
 interface RegistrationPageProps {
