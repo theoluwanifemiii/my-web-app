@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, LogOut, QrCode, Mail } from 'lucide-react';
+import { Download, LogOut, QrCode } from 'lucide-react';
 import type { RegistrationData } from './RegistrationPage';
 
 interface AdminDashboardProps {
