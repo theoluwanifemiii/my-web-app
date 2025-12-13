@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, LogOut, QrCode } from 'lucide-react';
+import { Download, LogOut, QrCode, Search } from 'lucide-react';
 import type { RegistrationData } from './RegistrationPage';
 
 interface AdminDashboardProps {
@@ -22,6 +22,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [partialAmount, setPartialAmount] = useState('');
   const [viewReceipt, setViewReceipt] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleApprove = (reg: RegistrationData) => {
     onUpdateRegistration(reg.id, {
@@ -56,7 +57,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const exportToCSV = () => {
     const headers = ['Name', 'Email', 'Phone', 'Church', 'Zone', 'Ticket Type', 'Guest Name', 'Total Due', 'Total Paid', 'Balance', 'Payment Method', 'Status'];
-    const rows = registrations.map(reg => [
+    const rows = filteredRegistrations.map(reg => [
       reg.name,
       reg.email,
       reg.phone,
@@ -80,6 +81,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Filter registrations based on search query
+  const filteredRegistrations = registrations.filter((reg) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      reg.name.toLowerCase().includes(query) ||
+      reg.email.toLowerCase().includes(query) ||
+      reg.phone.toLowerCase().includes(query) ||
+      reg.church.toLowerCase().includes(query) ||
+      reg.zone.toLowerCase().includes(query) ||
+      reg.guestName?.toLowerCase().includes(query) ||
+      reg.id.toLowerCase().includes(query)
+    );
+  });
 
   const totalRevenue = registrations.reduce((sum, reg) => sum + reg.totalPaid, 0);
   const pendingAmount = registrations.reduce((sum, reg) => sum + reg.balance, 0);
@@ -140,8 +155,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Table */}
+      {/* Search Bar & Table */}
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Search Bar */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search by name, email, phone, church, zone, or ticket ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <div className="mt-2 text-sm text-gray-600">
+              Found {filteredRegistrations.length} of {registrations.length} registrations
+            </div>
+          )}
+        </div>
+
+        {/* Table */}
         <div className="bg-white rounded-lg shadow overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
@@ -155,14 +198,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {registrations.length === 0 ? (
+              {filteredRegistrations.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                    No registrations yet
+                    {searchQuery ? 'No registrations match your search' : 'No registrations yet'}
                   </td>
                 </tr>
               ) : (
-                registrations.map((reg) => (
+                filteredRegistrations.map((reg) => (
                   <tr key={reg.id} className="hover:bg-gray-50">
                     <td className="px-3 py-3">
                       <div className="font-medium text-gray-900">{reg.name}</div>
