@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import RegistrationPage, { type RegistrationData } from './components/RegistrationPage';
 import AdminDashboard from './components/AdminDashboard';
 import QRScannerPage from './components/QRScannerPage';

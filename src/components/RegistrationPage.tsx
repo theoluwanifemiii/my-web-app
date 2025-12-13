@@ -59,7 +59,7 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
     setPaymentStep(true);
   };
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!paymentMethod) {
       setError('Select a payment method');
       return;
