@@ -13,11 +13,9 @@ function App() {
     return localStorage.getItem('isAdmin') === 'true';
   });
 
-  // Load registrations from Supabase on mount
   useEffect(() => {
     loadRegistrations();
     
-    // Subscribe to real-time changes
     const subscription = supabase
       .channel('registrations_changes')
       .on('postgres_changes', 
@@ -46,7 +44,6 @@ function App() {
 
       if (error) throw error;
       
-      // Convert snake_case to camelCase
       const formattedData = (data || []).map((reg: any) => ({
         id: reg.id,
         name: reg.name,
@@ -56,12 +53,14 @@ function App() {
         zone: reg.zone,
         ticketType: reg.ticket_type,
         guestName: reg.guest_name,
+        mealChoice: reg.meal_choice,
         totalDue: reg.total_due,
         totalPaid: reg.total_paid,
         balance: reg.balance,
         paymentMethod: reg.payment_method,
         status: reg.status,
         transactionRef: reg.transaction_ref,
+        receiverName: reg.receiver_name,
         receiptImage: reg.receipt_image,
         ticketQR: reg.ticket_qr,
         ticketGenerated: reg.ticket_generated,
@@ -79,8 +78,9 @@ function App() {
 
   const handleAddRegistration = async (registration: RegistrationData) => {
     try {
-      // Convert camelCase to snake_case for Supabase
-      const { error } = await supabase
+      console.log('Attempting to save:', registration);
+      
+      const { data, error } = await supabase
         .from('registrations')
         .insert({
           id: registration.id,
@@ -91,19 +91,26 @@ function App() {
           zone: registration.zone,
           ticket_type: registration.ticketType,
           guest_name: registration.guestName,
+          meal_choice: registration.mealChoice,
           total_due: registration.totalDue,
           total_paid: registration.totalPaid,
           balance: registration.balance,
           payment_method: registration.paymentMethod,
           status: registration.status,
           transaction_ref: registration.transactionRef,
+          receiver_name: registration.receiverName,
           receipt_image: registration.receiptImage,
           created_at: registration.createdAt,
-        });
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
       
-      // Reload to get the new data
+      console.log('Successfully saved:', data);
+      
       await loadRegistrations();
     } catch (error) {
       console.error('Error adding registration:', error);
@@ -113,7 +120,6 @@ function App() {
 
   const handleUpdateRegistration = async (id: string, updates: Partial<RegistrationData>) => {
     try {
-      // Convert camelCase to snake_case
       const supabaseUpdates: any = {};
       if (updates.totalPaid !== undefined) supabaseUpdates.total_paid = updates.totalPaid;
       if (updates.balance !== undefined) supabaseUpdates.balance = updates.balance;
@@ -129,7 +135,6 @@ function App() {
 
       if (error) throw error;
       
-      // Reload to get the updated data
       await loadRegistrations();
     } catch (error) {
       console.error('Error updating registration:', error);
@@ -149,7 +154,10 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+          <p className="text-white text-xl mt-4">Loading...</p>
+        </div>
       </div>
     );
   }

@@ -11,22 +11,31 @@ export interface RegistrationData {
   zone: string;
   ticketType: 'solo' | 'guest';
   guestName?: string;
+  mealChoice?: string;
   totalDue: number;
   totalPaid: number;
   balance: number;
   paymentMethod: 'cash' | 'transfer' | null;
   status: 'paid' | 'pending';
   transactionRef?: string;
+  receiverName?: string;
   receiptImage?: string | null;
   createdAt: string;
   checkedIn?: boolean;
-  ticketQR?: string;           
-  ticketGenerated?: boolean;   
+  ticketQR?: string;
+  ticketGenerated?: boolean;
 }
 
 interface RegistrationPageProps {
   onRegister: (registration: RegistrationData) => void;
 }
+
+const MEAL_OPTIONS = [
+  { value: 'semo-egusi', label: 'Semo and Egusi Elefo (Yoruba)' },
+  { value: 'amala-gbegiri', label: 'Amala, Gbegiri and Ewedu (Yoruba)' },
+  { value: 'fufu-edikaikong', label: 'Fufu and Edikaikong (Igbo)' },
+  { value: 'eba-edikaikong', label: 'Yellow Eba and Edikaikong (Igbo)' },
+];
 
 export default function RegistrationPage({ onRegister }: RegistrationPageProps) {
   const [formData, setFormData] = useState({
@@ -37,10 +46,13 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
     zone: 'Akoka',
     ticketType: 'solo' as 'solo' | 'guest',
     guestName: '',
+    mealChoice: '',
   });
   const [paymentStep, setPaymentStep] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | null>(null);
   const [staffPin, setStaffPin] = useState('');
+  const [receiverName, setReceiverName] = useState('');
+  const [amountPaid, setAmountPaid] = useState('');
   const [transactionRef, setTransactionRef] = useState('');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -48,15 +60,62 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
 
   const ticketPrice = formData.ticketType === 'solo' ? 2000 : 3000;
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone: string) => {
+    const digits = phone.replace(/\D/g, '');
+    return digits.length === 11 || digits.length === 10;
+  };
+
   const handleSubmit = () => {
-    if (!formData.name || !formData.phone || !formData.email || !formData.church) {
-      setError('Please fill all required fields');
+    if (!formData.name.trim()) {
+      setError('Please enter your full name');
       return;
     }
-    if (formData.ticketType === 'guest' && !formData.guestName) {
+
+    if (formData.name.trim().length < 3) {
+      setError('Name must be at least 3 characters');
+      return;
+    }
+
+    if (!formData.phone.trim()) {
+      setError('Please enter your phone number');
+      return;
+    }
+
+    if (!validatePhone(formData.phone)) {
+      setError('Please enter a valid 11-digit Nigerian phone number (e.g., 08012345678)');
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    if (!validateEmail(formData.email)) {
+      setError('Please enter a valid email address (e.g., name@example.com)');
+      return;
+    }
+
+    if (!formData.church.trim()) {
+      setError('Please enter your church name');
+      return;
+    }
+
+    if (!formData.mealChoice) {
+      setError('Please select your meal choice');
+      return;
+    }
+
+    if (formData.ticketType === 'guest' && !formData.guestName.trim()) {
       setError('Please enter guest name');
       return;
     }
+
     setError('');
     setPaymentStep(true);
   };
@@ -72,6 +131,23 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
         setError('Invalid Staff PIN');
         return;
       }
+      if (!receiverName.trim()) {
+        setError('Please enter the name of the person who received payment');
+        return;
+      }
+      if (!amountPaid) {
+        setError('Please enter amount paid');
+        return;
+      }
+      const amount = parseFloat(amountPaid);
+      if (isNaN(amount) || amount <= 0) {
+        setError('Please enter a valid amount');
+        return;
+      }
+      if (amount > ticketPrice) {
+        setError(`Amount cannot exceed ticket price of ₦${ticketPrice.toLocaleString()}`);
+        return;
+      }
     } else if (paymentMethod === 'transfer') {
       if (!transactionRef.trim()) {
         setError('Please enter transaction reference');
@@ -81,55 +157,70 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
         setError('Please upload payment receipt');
         return;
       }
+      if (!amountPaid) {
+        setError('Please enter amount paid');
+        return;
+      }
+      const amount = parseFloat(amountPaid);
+      if (isNaN(amount) || amount <= 0) {
+        setError('Please enter a valid amount');
+        return;
+      }
     }
 
+    const paidAmount = parseFloat(amountPaid);
+    const balance = ticketPrice - paidAmount;
+
     const registration: RegistrationData = {
-  id: Date.now().toString(),
-  name: formData.name,
-  phone: formData.phone,
-  email: formData.email,
-  church: formData.church,
-  zone: formData.zone,
-  ticketType: formData.ticketType,
-  guestName: formData.ticketType === 'guest' ? formData.guestName : undefined,
-  totalDue: ticketPrice,
-  totalPaid: paymentMethod === 'cash' ? ticketPrice : 0,
-  balance: paymentMethod === 'cash' ? 0 : ticketPrice,
-  paymentMethod,
-  status: paymentMethod === 'cash' ? 'paid' : 'pending',
-  transactionRef: paymentMethod === 'transfer' ? transactionRef : undefined,
-  receiptImage: paymentMethod === 'transfer' ? receiptImage : undefined,
-  createdAt: new Date().toISOString(),
-};
+      id: Date.now().toString(),
+      name: formData.name.trim(),
+      phone: formData.phone.trim(),
+      email: formData.email.trim().toLowerCase(),
+      church: formData.church.trim(),
+      zone: formData.zone,
+      ticketType: formData.ticketType,
+      guestName: formData.ticketType === 'guest' ? formData.guestName.trim() : undefined,
+      mealChoice: formData.mealChoice,
+      totalDue: ticketPrice,
+      totalPaid: paidAmount,
+      balance: balance,
+      paymentMethod,
+      status: balance <= 0 ? 'paid' : 'pending',
+      transactionRef: paymentMethod === 'transfer' ? transactionRef.trim() : undefined,
+      receiverName: paymentMethod === 'cash' ? receiverName.trim() : undefined,
+      receiptImage: paymentMethod === 'transfer' ? receiptImage : undefined,
+      createdAt: new Date().toISOString(),
+    };
 
-onRegister(registration);
+    onRegister(registration);
 
-// Send confirmation email
-try {
-  await sendTicketEmail({
-    to: registration.email,
-    name: registration.name,
-    ticketId: registration.id,
-    church: registration.church,
-    zone: registration.zone,
-    ticketType: registration.ticketType,
-    guestName: registration.guestName
-  });
-  console.log('✅ Email sent successfully');
-} catch (error) {
-  console.error('❌ Email failed:', error);
-}
+    try {
+      await sendTicketEmail({
+        to: registration.email,
+        name: registration.name,
+        ticketId: registration.id,
+        church: registration.church,
+        zone: registration.zone,
+        ticketType: registration.ticketType,
+        guestName: registration.guestName
+      });
+      console.log('✅ Email sent successfully');
+    } catch (error) {
+      console.error('❌ Email failed:', error);
+    }
 
-setShowSuccess(true);
+    setShowSuccess(true);
 
     setTimeout(() => {
       setShowSuccess(false);
       setPaymentStep(false);
       setPaymentMethod(null);
       setStaffPin('');
+      setReceiverName('');
+      setAmountPaid('');
       setTransactionRef('');
       setReceiptImage(null);
-      setFormData({ name: '', phone: '', email: '', church: '', zone: 'Akoka', ticketType: 'solo', guestName: '' });
+      setFormData({ name: '', phone: '', email: '', church: '', zone: 'Akoka', ticketType: 'solo', guestName: '', mealChoice: '' });
     }, 3000);
   };
 
@@ -149,7 +240,6 @@ setShowSuccess(true);
     }
   };
 
-  // Success screen
   if (showSuccess) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -165,7 +255,7 @@ setShowSuccess(true);
           {paymentMethod === 'transfer' ? (
             <>
               <p className="text-gray-600 mb-2">Your registration has been received!</p>
-              <p className="text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+              <p className="text-sm text-yellow-600 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
                 ⏳ Your ticket will be activated once we verify your payment
               </p>
             </>
@@ -186,7 +276,6 @@ setShowSuccess(true);
     );
   }
 
-  // Payment step
   if (paymentStep) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -225,34 +314,80 @@ setShowSuccess(true);
           </div>
 
           {paymentMethod === 'cash' && (
-            <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Staff PIN</label>
-              <input
-                type="password"
-                placeholder="Enter 4-digit PIN"
-                value={staffPin}
-                onChange={(e) => setStaffPin(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none"
-              />
+            <div className="space-y-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount Paid <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">Total due: ₦{ticketPrice.toLocaleString()}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Received By <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  placeholder="Name of person who received payment"
+                  value={receiverName}
+                  onChange={(e) => setReceiverName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Staff PIN <span className="text-red-500">*</span></label>
+                <input
+                  type="password"
+                  placeholder="Enter 4-digit PIN"
+                  value={staffPin}
+                  onChange={(e) => setStaffPin(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none"
+                />
+              </div>
             </div>
           )}
 
           {paymentMethod === 'transfer' && (
             <div className="space-y-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <h3 className="font-semibold text-blue-900 mb-2">Bank Account Details</h3>
+                <div className="space-y-1 text-sm text-blue-800">
+                  <div><span className="font-medium">Bank:</span> Opay</div>
+                  <div><span className="font-medium">Account Name:</span> Matthew Victor</div>
+                  <div className="flex items-center justify-between">
+                    <div><span className="font-medium">Account Number:</span> <span className="text-lg font-bold">9037126739</span></div>
+                  </div>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Transaction Reference</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount Paid <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  placeholder="Enter amount transferred"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">Total due: ₦{ticketPrice.toLocaleString()}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Transaction Reference <span className="text-red-500">*</span></label>
                 <input
                   type="text"
-                  placeholder="Enter transaction reference"
+                  placeholder="Enter transaction reference or sender name"
                   value={transactionRef}
                   onChange={(e) => setTransactionRef(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Upload Receipt</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-purple-500 transition-colors">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Upload Receipt <span className="text-red-500">*</span></label>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-blue-500 transition-colors">
                   <input 
                     type="file" 
                     accept="image/*" 
@@ -262,11 +397,15 @@ setShowSuccess(true);
                   />
                   <label htmlFor="receipt-upload" className="cursor-pointer">
                     {receiptImage ? (
-                      <img src={receiptImage} alt="Receipt Preview" className="max-h-40 mx-auto rounded-lg" />
+                      <div>
+                        <img src={receiptImage} alt="Receipt Preview" className="max-h-40 mx-auto rounded-lg mb-2" />
+                        <span className="text-sm text-green-600 font-medium">✓ Receipt uploaded - Click to change</span>
+                      </div>
                     ) : (
                       <div className="text-gray-500">
                         <div className="text-4xl mb-2">📎</div>
-                        <p className="text-sm">Click to upload receipt</p>
+                        <p className="text-sm">Click to upload payment receipt</p>
+                        <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
                       </div>
                     )}
                   </label>
@@ -283,7 +422,7 @@ setShowSuccess(true);
 
           <div className="flex gap-3">
             <button 
-              onClick={() => { setPaymentStep(false); setError(''); }} 
+              onClick={() => { setPaymentStep(false); setPaymentMethod(null); setAmountPaid(''); setReceiverName(''); setError(''); }} 
               className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all"
             >
               ← Back
@@ -300,10 +439,8 @@ setShowSuccess(true);
     );
   }
 
-  // Registration form
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      {/* Background decoration */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10"></div>
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/20 via-transparent to-transparent"></div>
       
@@ -315,7 +452,7 @@ setShowSuccess(true);
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name <span className="text-red-500">*</span></label>
             <input
               type="text"
               placeholder="John Doe"
@@ -326,18 +463,20 @@ setShowSuccess(true);
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number <span className="text-red-500">*</span></label>
             <input
               type="tel"
-              placeholder="+234 800 000 0000"
+              placeholder="08012345678"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              maxLength={11}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
             />
+            <p className="text-xs text-gray-500 mt-1">11-digit Nigerian number</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address <span className="text-red-500">*</span></label>
             <input
               type="email"
               placeholder="john@example.com"
@@ -348,7 +487,7 @@ setShowSuccess(true);
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Church Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Church Name <span className="text-red-500">*</span></label>
             <input
               type="text"
               placeholder="Your Church"
@@ -359,20 +498,35 @@ setShowSuccess(true);
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Zone</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Zone <span className="text-red-500">*</span></label>
             <select
               value={formData.zone}
               onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
             >
               <option value="Akoka">Akoka</option>
-              <option value="Yaba">Yaba</option>
-              <option value="Ikeja">Ikeja</option>
+              <option value="Ilaje">Ilaje</option>
+              <option value="Jebako">Jebako</option>
+              <option value="Shomolu">Shomolu</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Ticket Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Meal Choice <span className="text-red-500">*</span></label>
+            <select
+              value={formData.mealChoice}
+              onChange={(e) => setFormData({ ...formData, mealChoice: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+            >
+              <option value="">Select your meal</option>
+              {MEAL_OPTIONS.map(meal => (
+                <option key={meal.value} value={meal.value}>{meal.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Ticket Type <span className="text-red-500">*</span></label>
             <select
               value={formData.ticketType}
               onChange={(e) => setFormData({ ...formData, ticketType: e.target.value as 'solo' | 'guest' })}
@@ -385,7 +539,7 @@ setShowSuccess(true);
 
           {formData.ticketType === 'guest' && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Guest Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Guest Name <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 placeholder="Guest Full Name"

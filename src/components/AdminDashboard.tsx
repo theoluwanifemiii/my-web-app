@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, LogOut, QrCode, Search } from 'lucide-react';
+import { Download, LogOut, QrCode, Search, Filter } from 'lucide-react';
 import type { RegistrationData } from './RegistrationPage';
 
 interface AdminDashboardProps {
@@ -12,6 +12,13 @@ interface AdminDashboardProps {
   onOpenScanner: () => void;
 }
 
+const MEAL_LABELS: Record<string, string> = {
+  'semo-egusi': 'Semo & Egusi Elefo',
+  'amala-gbegiri': 'Amala, Gbegiri & Ewedu',
+  'fufu-edikaikong': 'Fufu & Edikaikong',
+  'eba-edikaikong': 'Yellow Eba & Edikaikong',
+};
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   registrations,
   onUpdateRegistration,
@@ -21,53 +28,97 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [showAddPayment, setShowAddPayment] = useState<string | null>(null);
   const [partialAmount, setPartialAmount] = useState('');
   const [viewReceipt, setViewReceipt] = useState<string | null>(null);
+  const [viewTicket, setViewTicket] = useState<RegistrationData | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+  const [approvingPayment, setApprovingPayment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [zoneFilter, setZoneFilter] = useState<string>('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
- const handleApprove = (reg: RegistrationData) => {
-  // Generate QR code
-  const qrData = JSON.stringify({
-    id: reg.id,
-    name: reg.name,
-    ticketType: reg.ticketType,
-    guestName: reg.guestName,
-  });
-  const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+  const handleApprove = async (reg: RegistrationData) => {
+    try {
+      // Generate QR code
+      const qrData = JSON.stringify({
+        id: reg.id,
+        name: reg.name,
+        ticketType: reg.ticketType,
+        guestName: reg.guestName,
+      });
+      const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
 
-  // Update with payment approval + ticket
-  onUpdateRegistration(reg.id, {
-    status: 'paid',
-    totalPaid: reg.totalDue,
-    balance: 0,
-    ticketQR: qrCode,
-    ticketGenerated: true,
-  });
-};
+      console.log('=== APPROVE BUTTON CLICKED ===');
+      console.log('Registration ID:', reg.id);
+      console.log('Approving payment...');
+      
+      setApprovingPayment(reg.id);
+      
+      await onUpdateRegistration(reg.id, {
+        status: 'paid',
+        totalPaid: reg.totalDue,
+        balance: 0,
+        ticketQR: qrCode,
+        ticketGenerated: true,
+      });
+
+      console.log('✅ Payment approved successfully!');
+      setApprovingPayment(null);
+    } catch (error) {
+      console.error('❌ Error approving payment:', error);
+      setApprovingPayment(null);
+      alert('Failed to approve payment. Please try again.');
+    }
+  };
+
   const handleSendETicket = (id: string) => {
     setSendingEmail(id);
     onSendETicket(id);
     setTimeout(() => setSendingEmail(null), 1000);
   };
 
-  const handleAddPartialPayment = (reg: RegistrationData) => {
-    const amount = parseFloat(partialAmount);
-    if (isNaN(amount) || amount <= 0) return;
+  const handleAddPartialPayment = async (reg: RegistrationData) => {
+    try {
+      const amount = parseFloat(partialAmount);
+      if (isNaN(amount) || amount <= 0) return;
 
-    const newTotalPaid = reg.totalPaid + amount;
-    const newBalance = reg.totalDue - newTotalPaid;
+      const newTotalPaid = reg.totalPaid + amount;
+      const newBalance = reg.totalDue - newTotalPaid;
 
-    onUpdateRegistration(reg.id, {
-      totalPaid: newTotalPaid,
-      balance: newBalance,
-      status: newBalance <= 0 ? 'paid' : reg.status,
-    });
+      // If fully paid, generate ticket immediately
+      if (newBalance <= 0) {
+        const qrData = JSON.stringify({
+          id: reg.id,
+          name: reg.name,
+          ticketType: reg.ticketType,
+          guestName: reg.guestName,
+        });
+        const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+        
+        await onUpdateRegistration(reg.id, {
+          totalPaid: newTotalPaid,
+          balance: 0,
+          status: 'paid',
+          ticketQR: qrCode,
+          ticketGenerated: true,
+        });
+      } else {
+        await onUpdateRegistration(reg.id, {
+          totalPaid: newTotalPaid,
+          balance: newBalance,
+          status: 'pending',
+        });
+      }
 
-    setShowAddPayment(null);
-    setPartialAmount('');
+      setShowAddPayment(null);
+      setPartialAmount('');
+    } catch (error) {
+      console.error('Error adding partial payment:', error);
+      alert('Failed to add payment. Please try again.');
+    }
   };
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'Church', 'Zone', 'Ticket Type', 'Guest Name', 'Total Due', 'Total Paid', 'Balance', 'Payment Method', 'Status'];
+    const headers = ['Name', 'Email', 'Phone', 'Church', 'Zone', 'Ticket Type', 'Guest Name', 'Meal Choice', 'Total Due', 'Total Paid', 'Balance', 'Payment Method', 'Receiver/Ref', 'Status', 'Checked In'];
     const rows = filteredRegistrations.map(reg => [
       reg.name,
       reg.email,
@@ -76,11 +127,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       reg.zone,
       reg.ticketType === 'solo' ? 'Solo' : 'Me + 1 Guest',
       reg.guestName || '-',
+      reg.mealChoice ? MEAL_LABELS[reg.mealChoice] || reg.mealChoice : '-',
       reg.totalDue,
       reg.totalPaid,
       reg.balance,
       reg.paymentMethod === 'cash' ? 'Cash' : 'Bank Transfer',
+      reg.receiverName || reg.transactionRef || '-',
       reg.status === 'paid' ? 'Paid' : 'Pending',
+      reg.checkedIn ? 'Yes' : 'No',
     ]);
 
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
@@ -93,18 +147,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Filter registrations based on search query
+  // Filter registrations
   const filteredRegistrations = registrations.filter((reg) => {
     const query = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = 
       reg.name.toLowerCase().includes(query) ||
       reg.email.toLowerCase().includes(query) ||
       reg.phone.toLowerCase().includes(query) ||
       reg.church.toLowerCase().includes(query) ||
       reg.zone.toLowerCase().includes(query) ||
       reg.guestName?.toLowerCase().includes(query) ||
-      reg.id.toLowerCase().includes(query)
-    );
+      reg.id.toLowerCase().includes(query);
+
+    const matchesZone = zoneFilter === 'all' || reg.zone === zoneFilter;
+    const matchesPaymentMethod = paymentMethodFilter === 'all' || reg.paymentMethod === paymentMethodFilter;
+    const matchesStatus = statusFilter === 'all' || reg.status === statusFilter;
+
+    return matchesSearch && matchesZone && matchesPaymentMethod && matchesStatus;
   });
 
   const totalRevenue = registrations.reduce((sum, reg) => sum + reg.totalPaid, 0);
@@ -166,7 +225,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Search Bar & Table */}
+      {/* Search & Filters */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Search Bar */}
         <div className="mb-4">
@@ -188,11 +247,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             )}
           </div>
-          {searchQuery && (
-            <div className="mt-2 text-sm text-gray-600">
-              Found {filteredRegistrations.length} of {registrations.length} registrations
-            </div>
+        </div>
+
+        {/* Filters */}
+        <div className="mb-4 flex flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Filters:</span>
+          </div>
+          
+          <select
+            value={zoneFilter}
+            onChange={(e) => setZoneFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+          >
+            <option value="all">All Zones</option>
+            <option value="Akoka">Akoka</option>
+            <option value="Ilaje">Ilaje</option>
+            <option value="Jebako">Jebako</option>
+            <option value="Shomolu">Shomolu</option>
+          </select>
+
+          <select
+            value={paymentMethodFilter}
+            onChange={(e) => setPaymentMethodFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+          >
+            <option value="all">All Payment Methods</option>
+            <option value="cash">Cash</option>
+            <option value="transfer">Bank Transfer</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+          >
+            <option value="all">All Status</option>
+            <option value="paid">Paid</option>
+            <option value="pending">Pending</option>
+          </select>
+
+          {(zoneFilter !== 'all' || paymentMethodFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+            <button
+              onClick={() => {
+                setZoneFilter('all');
+                setPaymentMethodFilter('all');
+                setStatusFilter('all');
+                setSearchQuery('');
+              }}
+              className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition"
+            >
+              Clear Filters
+            </button>
           )}
+        </div>
+
+        <div className="text-sm text-gray-600 mb-4">
+          Showing {filteredRegistrations.length} of {registrations.length} registrations
         </div>
 
         {/* Table */}
@@ -203,6 +315,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <th className="px-3 py-3 text-left font-semibold text-gray-700">Name</th>
                 <th className="px-3 py-3 text-left font-semibold text-gray-700">Church</th>
                 <th className="px-3 py-3 text-left font-semibold text-gray-700">Zone</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700">Meal</th>
                 <th className="px-3 py-3 text-right font-semibold text-gray-700">Amount</th>
                 <th className="px-3 py-3 text-center font-semibold text-gray-700">Status</th>
                 <th className="px-3 py-3 text-center font-semibold text-gray-700">Actions</th>
@@ -211,8 +324,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <tbody className="divide-y">
               {filteredRegistrations.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                    {searchQuery ? 'No registrations match your search' : 'No registrations yet'}
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    {searchQuery || zoneFilter !== 'all' || paymentMethodFilter !== 'all' || statusFilter !== 'all'
+                      ? 'No registrations match your filters'
+                      : 'No registrations yet'}
                   </td>
                 </tr>
               ) : (
@@ -224,11 +339,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="text-xs text-gray-500">+ {reg.guestName}</div>
                       )}
                       <div className="text-xs text-gray-500">{reg.phone}</div>
+                      {reg.receiverName && (
+                        <div className="text-xs text-blue-600">Paid to: {reg.receiverName}</div>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-gray-700 text-sm">{reg.church}</td>
                     <td className="px-3 py-3">
                       <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
                         {reg.zone}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-xs text-gray-600">
+                        {reg.mealChoice ? MEAL_LABELS[reg.mealChoice] || reg.mealChoice : '-'}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right">
@@ -252,15 +375,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       >
                         {reg.status === 'paid' ? 'Paid' : 'Pending'}
                       </span>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {reg.paymentMethod === 'cash' ? '💵 Cash' : '🏦 Transfer'}
+                      </div>
+                      {reg.ticketGenerated && (
+                        <div className="text-xs text-blue-600 mt-1">✓ Ticket Ready</div>
+                      )}
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex gap-1 justify-center flex-wrap">
                         {reg.status === 'pending' && reg.paymentMethod === 'transfer' && (
                           <button
                             onClick={() => handleApprove(reg)}
-                            className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition"
+                            disabled={approvingPayment === reg.id}
+                            className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Approve
+                            {approvingPayment === reg.id ? 'Approving...' : 'Approve'}
                           </button>
                         )}
                         {reg.balance > 0 && (
@@ -271,13 +401,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             Add $
                           </button>
                         )}
-                        {reg.balance === 0 && (
+                        {reg.balance === 0 && !reg.ticketGenerated && (
                           <button
-                            onClick={() => handleSendETicket(reg.id)}
-                            disabled={sendingEmail === reg.id}
-                            className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition disabled:opacity-50"
+                            onClick={() => handleApprove(reg)}
+                            disabled={approvingPayment === reg.id}
+                            className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {sendingEmail === reg.id ? 'Sending...' : 'E-Ticket'}
+                            {approvingPayment === reg.id ? 'Generating...' : 'Generate'}
+                          </button>
+                        )}
+                        {reg.ticketQR && (
+                          <button
+                            onClick={() => setViewTicket(reg)}
+                            className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition"
+                          >
+                            View
                           </button>
                         )}
                         {reg.receiptImage && (
@@ -338,6 +476,76 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 >
                   Add Payment
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Ticket Modal */}
+        {viewTicket && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
+            onClick={() => setViewTicket(null)}
+          >
+            <div
+              className="bg-white rounded-lg p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold">E-Ticket</h3>
+                <button
+                  onClick={() => setViewTicket(null)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="border-2 border-dashed border-purple-300 rounded-lg p-6 bg-gradient-to-br from-purple-50 to-blue-50">
+                <div className="text-center mb-4">
+                  <h4 className="text-2xl font-bold text-gray-800 mb-2">Thanksgiving Dinner</h4>
+                  <p className="text-gray-600">Dec 31, 2024 • 7:00 PM</p>
+                </div>
+                <div className="bg-white rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <div className="text-gray-500">Name</div>
+                      <div className="font-semibold">{viewTicket.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">Church</div>
+                      <div className="font-semibold">{viewTicket.church}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">Zone</div>
+                      <div className="font-semibold">{viewTicket.zone}</div>
+                    </div>
+                    {viewTicket.guestName && (
+                      <div>
+                        <div className="text-gray-500">Guest</div>
+                        <div className="font-semibold">{viewTicket.guestName}</div>
+                      </div>
+                    )}
+                    {viewTicket.mealChoice && (
+                      <div className="col-span-2">
+                        <div className="text-gray-500">Meal Choice</div>
+                        <div className="font-semibold">
+                          {MEAL_LABELS[viewTicket.mealChoice] || viewTicket.mealChoice}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {viewTicket.ticketQR && (
+                  <div className="text-center">
+                    <img
+                      src={viewTicket.ticketQR}
+                      alt="QR"
+                      className="w-48 h-48 mx-auto mb-2"
+                    />
+                    <p className="text-xs text-gray-600">Scan at entrance</p>
+                    <p className="text-xs text-gray-500 mt-2">ID: {viewTicket.id}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
