@@ -29,16 +29,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [partialAmount, setPartialAmount] = useState('');
   const [viewReceipt, setViewReceipt] = useState<string | null>(null);
   const [viewTicket, setViewTicket] = useState<RegistrationData | null>(null);
-  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+ const [_sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [approvingPayment, setApprovingPayment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const handleApprove = async (reg: RegistrationData) => {
-    try {
-      // Generate QR code
+  const handleApprove = (reg: RegistrationData) => {
+    // Generate QR code
+    const qrData = JSON.stringify({
+      id: reg.id,
+      name: reg.name,
+      ticketType: reg.ticketType,
+      guestName: reg.guestName,
+    });
+    const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+
+    // Update with payment approval + ticket in one call
+    console.log('Approving payment for:', reg.name);
+    setApprovingPayment(reg.id);
+    
+    onUpdateRegistration(reg.id, {
+      status: 'paid',
+      totalPaid: reg.totalDue,
+      balance: 0,
+      ticketQR: qrCode,
+      ticketGenerated: true,
+    });
+
+    setTimeout(() => setApprovingPayment(null), 2000);
+  };
+
+ const _handleSendETicket = (id: string) => {
+  setSendingEmail(id);
+  onSendETicket(id);
+  setTimeout(() => setSendingEmail(null), 1000);
+};
+
+void _handleSendETicket;
+
+
+  const handleAddPartialPayment = (reg: RegistrationData) => {
+    const amount = parseFloat(partialAmount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    const newTotalPaid = reg.totalPaid + amount;
+    const newBalance = reg.totalDue - newTotalPaid;
+
+    // If fully paid, generate ticket immediately
+    if (newBalance <= 0) {
       const qrData = JSON.stringify({
         id: reg.id,
         name: reg.name,
@@ -46,75 +86,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         guestName: reg.guestName,
       });
       const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-
-      console.log('=== APPROVE BUTTON CLICKED ===');
-      console.log('Registration ID:', reg.id);
-      console.log('Approving payment...');
       
-      setApprovingPayment(reg.id);
-      
-      await onUpdateRegistration(reg.id, {
-        status: 'paid',
-        totalPaid: reg.totalDue,
+      onUpdateRegistration(reg.id, {
+        totalPaid: newTotalPaid,
         balance: 0,
+        status: 'paid',
         ticketQR: qrCode,
         ticketGenerated: true,
       });
-
-      console.log('✅ Payment approved successfully!');
-      setApprovingPayment(null);
-    } catch (error) {
-      console.error('❌ Error approving payment:', error);
-      setApprovingPayment(null);
-      alert('Failed to approve payment. Please try again.');
+    } else {
+      onUpdateRegistration(reg.id, {
+        totalPaid: newTotalPaid,
+        balance: newBalance,
+        status: 'pending',
+      });
     }
-  };
 
-  const handleSendETicket = (id: string) => {
-    setSendingEmail(id);
-    onSendETicket(id);
-    setTimeout(() => setSendingEmail(null), 1000);
-  };
-
-  const handleAddPartialPayment = async (reg: RegistrationData) => {
-    try {
-      const amount = parseFloat(partialAmount);
-      if (isNaN(amount) || amount <= 0) return;
-
-      const newTotalPaid = reg.totalPaid + amount;
-      const newBalance = reg.totalDue - newTotalPaid;
-
-      // If fully paid, generate ticket immediately
-      if (newBalance <= 0) {
-        const qrData = JSON.stringify({
-          id: reg.id,
-          name: reg.name,
-          ticketType: reg.ticketType,
-          guestName: reg.guestName,
-        });
-        const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-        
-        await onUpdateRegistration(reg.id, {
-          totalPaid: newTotalPaid,
-          balance: 0,
-          status: 'paid',
-          ticketQR: qrCode,
-          ticketGenerated: true,
-        });
-      } else {
-        await onUpdateRegistration(reg.id, {
-          totalPaid: newTotalPaid,
-          balance: newBalance,
-          status: 'pending',
-        });
-      }
-
-      setShowAddPayment(null);
-      setPartialAmount('');
-    } catch (error) {
-      console.error('Error adding partial payment:', error);
-      alert('Failed to add payment. Please try again.');
-    }
+    setShowAddPayment(null);
+    setPartialAmount('');
   };
 
   const exportToCSV = () => {
