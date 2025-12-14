@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.87.1",
     "@vercel/analytics": "^1.6.1",
+    "libphonenumber-js": "^1.12.31",
     "lucide-react": "^0.560.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

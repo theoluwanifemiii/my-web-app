@@ -53,6 +53,8 @@ function App() {
         zone: reg.zone,
         ticketType: reg.ticket_type,
         guestName: reg.guest_name,
+        groupSize: reg.group_size,
+        additionalAttendees: reg.additional_attendees,
         mealChoice: reg.meal_choice,
         totalDue: reg.total_due,
         totalPaid: reg.total_paid,
@@ -91,6 +93,8 @@ function App() {
           zone: registration.zone,
           ticket_type: registration.ticketType,
           guest_name: registration.guestName,
+          group_size: registration.groupSize,
+          additional_attendees: registration.additionalAttendees,
           meal_choice: registration.mealChoice,
           total_due: registration.totalDue,
           total_paid: registration.totalPaid,
@@ -120,6 +124,8 @@ function App() {
 
   const handleUpdateRegistration = async (id: string, updates: Partial<RegistrationData>) => {
     try {
+      console.log('Updating registration:', id, updates);
+      
       const supabaseUpdates: any = {};
       if (updates.totalPaid !== undefined) supabaseUpdates.total_paid = updates.totalPaid;
       if (updates.balance !== undefined) supabaseUpdates.balance = updates.balance;
@@ -128,17 +134,25 @@ function App() {
       if (updates.ticketGenerated !== undefined) supabaseUpdates.ticket_generated = updates.ticketGenerated;
       if (updates.checkedIn !== undefined) supabaseUpdates.checked_in = updates.checkedIn;
 
-      const { error } = await supabase
+      console.log('Supabase updates:', supabaseUpdates);
+
+      const { data, error } = await supabase
         .from('registrations')
         .update(supabaseUpdates)
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase update error:', error);
+        throw error;
+      }
+      
+      console.log('Update successful:', data);
       
       await loadRegistrations();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating registration:', error);
-      alert('Failed to update registration. Please try again.');
+      alert(`Failed to update registration: ${error.message || 'Unknown error'}`);
     }
   };
 

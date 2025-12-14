@@ -29,56 +29,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [partialAmount, setPartialAmount] = useState('');
   const [viewReceipt, setViewReceipt] = useState<string | null>(null);
   const [viewTicket, setViewTicket] = useState<RegistrationData | null>(null);
- const [_sendingEmail, setSendingEmail] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [approvingPayment, setApprovingPayment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const handleApprove = (reg: RegistrationData) => {
-    // Generate QR code
-    const qrData = JSON.stringify({
-      id: reg.id,
-      name: reg.name,
-      ticketType: reg.ticketType,
-      guestName: reg.guestName,
-    });
-    const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-
-    // Update with payment approval + ticket in one call
-    console.log('Approving payment for:', reg.name);
-    setApprovingPayment(reg.id);
-    
-    onUpdateRegistration(reg.id, {
-      status: 'paid',
-      totalPaid: reg.totalDue,
-      balance: 0,
-      ticketQR: qrCode,
-      ticketGenerated: true,
-    });
-
-    setTimeout(() => setApprovingPayment(null), 2000);
-  };
-
- const _handleSendETicket = (id: string) => {
-  setSendingEmail(id);
-  onSendETicket(id);
-  setTimeout(() => setSendingEmail(null), 1000);
-};
-
-void _handleSendETicket;
-
-
-  const handleAddPartialPayment = (reg: RegistrationData) => {
-    const amount = parseFloat(partialAmount);
-    if (isNaN(amount) || amount <= 0) return;
-
-    const newTotalPaid = reg.totalPaid + amount;
-    const newBalance = reg.totalDue - newTotalPaid;
-
-    // If fully paid, generate ticket immediately
-    if (newBalance <= 0) {
+  const handleApprove = async (reg: RegistrationData) => {
+    try {
+      // Generate QR code
       const qrData = JSON.stringify({
         id: reg.id,
         name: reg.name,
@@ -86,47 +46,108 @@ void _handleSendETicket;
         guestName: reg.guestName,
       });
       const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+
+      console.log('=== APPROVE BUTTON CLICKED ===');
+      console.log('Registration ID:', reg.id);
+      console.log('Approving payment...');
       
-      onUpdateRegistration(reg.id, {
-        totalPaid: newTotalPaid,
-        balance: 0,
+      setApprovingPayment(reg.id);
+      
+      await onUpdateRegistration(reg.id, {
         status: 'paid',
+        totalPaid: reg.totalDue,
+        balance: 0,
         ticketQR: qrCode,
         ticketGenerated: true,
       });
-    } else {
-      onUpdateRegistration(reg.id, {
-        totalPaid: newTotalPaid,
-        balance: newBalance,
-        status: 'pending',
-      });
-    }
 
-    setShowAddPayment(null);
-    setPartialAmount('');
+      console.log('✅ Payment approved successfully!');
+      setApprovingPayment(null);
+    } catch (error) {
+      console.error('❌ Error approving payment:', error);
+      setApprovingPayment(null);
+      alert('Failed to approve payment. Please try again.');
+    }
+  };
+
+  const handleSendETicket = (id: string) => {
+    setSendingEmail(id);
+    onSendETicket(id);
+    setTimeout(() => setSendingEmail(null), 1000);
+  };
+
+  const handleAddPartialPayment = async (reg: RegistrationData) => {
+    try {
+      const amount = parseFloat(partialAmount);
+      if (isNaN(amount) || amount <= 0) return;
+
+      const newTotalPaid = reg.totalPaid + amount;
+      const newBalance = reg.totalDue - newTotalPaid;
+
+      // If fully paid, generate ticket immediately
+      if (newBalance <= 0) {
+        const qrData = JSON.stringify({
+          id: reg.id,
+          name: reg.name,
+          ticketType: reg.ticketType,
+          guestName: reg.guestName,
+        });
+        const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+        
+        await onUpdateRegistration(reg.id, {
+          totalPaid: newTotalPaid,
+          balance: 0,
+          status: 'paid',
+          ticketQR: qrCode,
+          ticketGenerated: true,
+        });
+      } else {
+        await onUpdateRegistration(reg.id, {
+          totalPaid: newTotalPaid,
+          balance: newBalance,
+          status: 'pending',
+        });
+      }
+
+      setShowAddPayment(null);
+      setPartialAmount('');
+    } catch (error) {
+      console.error('Error adding partial payment:', error);
+      alert('Failed to add payment. Please try again.');
+    }
   };
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'Church', 'Zone', 'Ticket Type', 'Guest Name', 'Meal Choice', 'Total Due', 'Total Paid', 'Balance', 'Payment Method', 'Receiver/Ref', 'Status', 'Checked In'];
-    const rows = filteredRegistrations.map(reg => [
-      reg.name,
-      reg.email,
-      reg.phone,
-      reg.church,
-      reg.zone,
-      reg.ticketType === 'solo' ? 'Solo' : 'Me + 1 Guest',
-      reg.guestName || '-',
-      reg.mealChoice ? MEAL_LABELS[reg.mealChoice] || reg.mealChoice : '-',
-      reg.totalDue,
-      reg.totalPaid,
-      reg.balance,
-      reg.paymentMethod === 'cash' ? 'Cash' : 'Bank Transfer',
-      reg.receiverName || reg.transactionRef || '-',
-      reg.status === 'paid' ? 'Paid' : 'Pending',
-      reg.checkedIn ? 'Yes' : 'No',
-    ]);
+    const headers = ['Name', 'Email', 'Phone', 'Church', 'Zone', 'Ticket Type', 'Guest Name', 'Group Size', 'Additional Attendees', 'Meal Choice', 'Total Due', 'Total Paid', 'Balance', 'Payment Method', 'Receiver/Ref', 'Status', 'Checked In'];
+    const rows = filteredRegistrations.map(reg => {
+      // Format additional attendees
+      let attendeesText = '-';
+      if (reg.additionalAttendees && reg.additionalAttendees.length > 0) {
+        attendeesText = reg.additionalAttendees.map(a => `${a.name} (${MEAL_LABELS[a.mealChoice] || a.mealChoice})`).join('; ');
+      }
 
-    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+      return [
+        reg.name,
+        reg.email,
+        reg.phone,
+        reg.church,
+        reg.zone,
+        reg.ticketType === 'solo' ? 'Solo' : reg.ticketType === 'guest' ? 'Me + 1 Guest' : 'Group',
+        reg.guestName || '-',
+        reg.groupSize || '-',
+        attendeesText,
+        reg.mealChoice ? MEAL_LABELS[reg.mealChoice] || reg.mealChoice : '-',
+        reg.totalDue,
+        reg.totalPaid,
+        reg.balance,
+        reg.paymentMethod === 'cash' ? 'Cash' : 'Bank Transfer',
+        reg.receiverName || reg.transactionRef || '-',
+        reg.status === 'paid' ? 'Paid' : 'Pending',
+        reg.checkedIn ? 'Yes' : 'No',
+      ];
+    });
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -327,6 +348,23 @@ void _handleSendETicket;
                       {reg.guestName && (
                         <div className="text-xs text-gray-500">+ {reg.guestName}</div>
                       )}
+                      {reg.ticketType === 'group' && reg.groupSize && (
+                        <div className="text-xs text-blue-600 font-medium mt-1">
+                          Group of {reg.groupSize} people
+                        </div>
+                      )}
+                      {reg.additionalAttendees && reg.additionalAttendees.length > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {reg.additionalAttendees.slice(0, 2).map((attendee, i) => (
+                            <div key={i}>• {attendee.name}</div>
+                          ))}
+                          {reg.additionalAttendees.length > 2 && (
+                            <div className="text-blue-600">
+                              + {reg.additionalAttendees.length - 2} more
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="text-xs text-gray-500">{reg.phone}</div>
                       {reg.receiverName && (
                         <div className="text-xs text-blue-600">Paid to: {reg.receiverName}</div>
@@ -514,15 +552,40 @@ void _handleSendETicket;
                         <div className="font-semibold">{viewTicket.guestName}</div>
                       </div>
                     )}
+                    {viewTicket.ticketType === 'group' && viewTicket.groupSize && (
+                      <div className="col-span-2">
+                        <div className="text-gray-500">Group Size</div>
+                        <div className="font-semibold">{viewTicket.groupSize} people</div>
+                      </div>
+                    )}
                     {viewTicket.mealChoice && (
                       <div className="col-span-2">
-                        <div className="text-gray-500">Meal Choice</div>
+                        <div className="text-gray-500">Meal Choice (Primary)</div>
                         <div className="font-semibold">
                           {MEAL_LABELS[viewTicket.mealChoice] || viewTicket.mealChoice}
                         </div>
                       </div>
                     )}
                   </div>
+
+                  {/* Additional Attendees */}
+                  {viewTicket.additionalAttendees && viewTicket.additionalAttendees.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="text-gray-500 text-sm mb-2 font-medium">Group Members:</div>
+                      <div className="space-y-2">
+                        {viewTicket.additionalAttendees.map((attendee, index) => (
+                          <div key={index} className="bg-purple-50 rounded-lg p-2 text-xs">
+                            <div className="font-semibold text-purple-900">
+                              {index + 2}. {attendee.name}
+                            </div>
+                            <div className="text-purple-700">
+                              Meal: {MEAL_LABELS[attendee.mealChoice] || attendee.mealChoice}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {viewTicket.ticketQR && (
                   <div className="text-center">

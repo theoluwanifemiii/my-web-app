@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { sendTicketEmail } from '../services/emailService';
+import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 
 export interface RegistrationData {
   id: string;
@@ -9,8 +10,10 @@ export interface RegistrationData {
   email: string;
   church: string;
   zone: string;
-  ticketType: 'solo' | 'guest';
+  ticketType: 'solo' | 'guest' | 'group';
   guestName?: string;
+  groupSize?: number;
+  additionalAttendees?: Array<{name: string; mealChoice: string}>;
   mealChoice?: string;
   totalDue: number;
   totalPaid: number;
@@ -44,9 +47,11 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
     email: '',
     church: '',
     zone: 'Akoka',
-    ticketType: 'solo' as 'solo' | 'guest',
+    ticketType: 'solo' as 'solo' | 'guest' | 'group',
     guestName: '',
     mealChoice: '',
+    groupSize: 2,
+    additionalAttendees: [] as Array<{name: string; mealChoice: string}>,
   });
   const [paymentStep, setPaymentStep] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | null>(null);
@@ -57,8 +62,13 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
-  const ticketPrice = formData.ticketType === 'solo' ? 2000 : 3000;
+  const ticketPrice = formData.ticketType === 'solo' 
+    ? 2000 
+    : formData.ticketType === 'guest' 
+    ? 3000 
+    : 2000 * formData.groupSize;
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,8 +76,37 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
   };
 
   const validatePhone = (phone: string) => {
-    const digits = phone.replace(/\D/g, '');
-    return digits.length === 11 || digits.length === 10;
+    try {
+      // Try to parse and validate the phone number
+      // If no country code is provided, assume Nigeria (NG)
+      if (phone.trim().startsWith('+')) {
+        // Has country code, validate internationally
+        return isValidPhoneNumber(phone);
+      } else if (phone.trim().startsWith('0')) {
+        // Nigerian local format (starts with 0)
+        return isValidPhoneNumber(phone, 'NG');
+      } else {
+        // Try both international and Nigerian format
+        return isValidPhoneNumber(phone) || isValidPhoneNumber(phone, 'NG');
+      }
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const formatPhoneForDisplay = (phone: string): string => {
+    try {
+      if (phone.startsWith('+')) {
+        const phoneNumber = parsePhoneNumber(phone);
+        return phoneNumber.formatInternational();
+      } else if (phone.startsWith('0')) {
+        const phoneNumber = parsePhoneNumber(phone, 'NG');
+        return phoneNumber.formatInternational();
+      }
+      return phone;
+    } catch (error) {
+      return phone;
+    }
   };
 
   const handleSubmit = () => {
@@ -87,7 +126,7 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
     }
 
     if (!validatePhone(formData.phone)) {
-      setError('Please enter a valid 11-digit Nigerian phone number (e.g., 08012345678)');
+      setError('Please enter a valid phone number with country code (e.g., +2348012345678, +1234567890, +447911123456)');
       return;
     }
 
@@ -114,6 +153,29 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
     if (formData.ticketType === 'guest' && !formData.guestName.trim()) {
       setError('Please enter guest name');
       return;
+    }
+
+    if (formData.ticketType === 'group') {
+      if (formData.groupSize < 2 || formData.groupSize > 20) {
+        setError('Group size must be between 2 and 20 people');
+        return;
+      }
+      // Check if all additional attendees have names and meal choices
+      if (formData.additionalAttendees.length !== formData.groupSize - 1) {
+        setError('Please add all attendees');
+        return;
+      }
+      for (let i = 0; i < formData.additionalAttendees.length; i++) {
+        const attendee = formData.additionalAttendees[i];
+        if (!attendee.name.trim()) {
+          setError(`Please enter name for attendee ${i + 2}`);
+          return;
+        }
+        if (!attendee.mealChoice) {
+          setError(`Please select meal choice for ${attendee.name || `attendee ${i + 2}`}`);
+          return;
+        }
+      }
     }
 
     setError('');
@@ -180,6 +242,8 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
       zone: formData.zone,
       ticketType: formData.ticketType,
       guestName: formData.ticketType === 'guest' ? formData.guestName.trim() : undefined,
+      groupSize: formData.ticketType === 'group' ? formData.groupSize : undefined,
+      additionalAttendees: formData.ticketType === 'group' ? formData.additionalAttendees : undefined,
       mealChoice: formData.mealChoice,
       totalDue: ticketPrice,
       totalPaid: paidAmount,
@@ -220,7 +284,7 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
       setAmountPaid('');
       setTransactionRef('');
       setReceiptImage(null);
-      setFormData({ name: '', phone: '', email: '', church: '', zone: 'Akoka', ticketType: 'solo', guestName: '', mealChoice: '' });
+      setFormData({ name: '', phone: '', email: '', church: '', zone: 'Akoka', ticketType: 'solo', guestName: '', mealChoice: '', groupSize: 2, additionalAttendees: [] });
     }, 3000);
   };
 
@@ -466,13 +530,29 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number <span className="text-red-500">*</span></label>
             <input
               type="tel"
-              placeholder="08012345678"
+              placeholder="+2348012345678, +1234567890, +447911123456"
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              maxLength={11}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormData({ ...formData, phone: value });
+                
+                // Real-time validation
+                if (value.trim()) {
+                  if (!validatePhone(value)) {
+                    setPhoneError('Invalid phone number format');
+                  } else {
+                    setPhoneError('✓ Valid phone number');
+                  }
+                } else {
+                  setPhoneError('');
+                }
+              }}
+              maxLength={20}
+              className={`w-full px-4 py-3 rounded-xl border ${phoneError && phoneError.includes('Invalid') ? 'border-red-500' : phoneError ? 'border-green-500' : 'border-gray-300'} focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white`}
             />
-            <p className="text-xs text-gray-500 mt-1">11-digit Nigerian number</p>
+            <p className={`text-xs mt-1 ${phoneError && phoneError.includes('Invalid') ? 'text-red-500' : phoneError ? 'text-green-600' : 'text-gray-500'}`}>
+              {phoneError || 'Include country code: +234 (Nigeria), +1 (USA), +44 (UK), etc.'}
+            </p>
           </div>
 
           <div>
@@ -526,15 +606,73 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Ticket Type <span className="text-red-500">*</span></label>
-            <select
-              value={formData.ticketType}
-              onChange={(e) => setFormData({ ...formData, ticketType: e.target.value as 'solo' | 'guest' })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
-            >
-              <option value="solo">Solo Ticket - ₦2,000</option>
-              <option value="guest">With Guest - ₦3,000</option>
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Ticket Type <span className="text-red-500">*</span>
+            </label>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, ticketType: 'solo' })}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  formData.ticketType === 'solo'
+                    ? 'border-purple-600 bg-purple-50'
+                    : 'border-gray-300 hover:border-purple-400'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">👤</span>
+                    <div className="text-left">
+                      <div className="font-semibold">Solo Ticket</div>
+                      <div className="text-sm text-gray-600">Just for you</div>
+                    </div>
+                  </div>
+                  <div className="text-xl font-bold text-purple-600">₦2,000</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, ticketType: 'guest' })}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  formData.ticketType === 'guest'
+                    ? 'border-purple-600 bg-purple-50'
+                    : 'border-gray-300 hover:border-purple-400'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">👥</span>
+                    <div className="text-left">
+                      <div className="font-semibold">Me + 1 Guest</div>
+                      <div className="text-sm text-gray-600">Bring a friend</div>
+                    </div>
+                  </div>
+                  <div className="text-xl font-bold text-purple-600">₦3,000</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, ticketType: 'group' })}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  formData.ticketType === 'group'
+                    ? 'border-purple-600 bg-purple-50'
+                    : 'border-gray-300 hover:border-purple-400'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">👨‍👩‍👧‍👦</span>
+                    <div className="text-left">
+                      <div className="font-semibold">Group Registration</div>
+                      <div className="text-sm text-gray-600">Register multiple people</div>
+                    </div>
+                  </div>
+                  <div className="text-xl font-bold text-purple-600">₦2,000/person</div>
+                </div>
+              </button>
+            </div>
           </div>
 
           {formData.ticketType === 'guest' && (
@@ -547,6 +685,69 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
                 onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
               />
+            </div>
+          )}
+
+          {formData.ticketType === 'group' && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-200 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Number of People (including you) <span className="text-red-500">*</span></label>
+                <select
+                  value={formData.groupSize}
+                  onChange={(e) => {
+                    const size = parseInt(e.target.value);
+                    const newAttendees = Array(size - 1).fill(null).map((_, i) => 
+                      formData.additionalAttendees[i] || { name: '', mealChoice: '' }
+                    );
+                    setFormData({ ...formData, groupSize: size, additionalAttendees: newAttendees });
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none bg-white"
+                >
+                  {[2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20].map(num => (
+                    <option key={num} value={num}>{num} people - ₦{(num * 2000).toLocaleString()}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <h3 className="font-semibold text-blue-900 mb-3">Additional Attendees</h3>
+                <p className="text-sm text-blue-700 mb-4">You are attendee #1. Please add details for the other {formData.groupSize - 1} {formData.groupSize === 2 ? 'person' : 'people'}.</p>
+                
+                <div className="space-y-3">
+                  {formData.additionalAttendees.map((attendee, index) => (
+                    <div key={index} className="bg-white rounded-lg p-3 border border-blue-100">
+                      <div className="font-medium text-blue-900 mb-2">Attendee #{index + 2}</div>
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          placeholder="Full Name"
+                          value={attendee.name}
+                          onChange={(e) => {
+                            const newAttendees = [...formData.additionalAttendees];
+                            newAttendees[index].name = e.target.value;
+                            setFormData({ ...formData, additionalAttendees: newAttendees });
+                          }}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none text-sm"
+                        />
+                        <select
+                          value={attendee.mealChoice}
+                          onChange={(e) => {
+                            const newAttendees = [...formData.additionalAttendees];
+                            newAttendees[index].mealChoice = e.target.value;
+                            setFormData({ ...formData, additionalAttendees: newAttendees });
+                          }}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none bg-white text-sm"
+                        >
+                          <option value="">Select meal choice</option>
+                          {MEAL_OPTIONS.map(meal => (
+                            <option key={meal.value} value={meal.value}>{meal.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
