@@ -22,14 +22,12 @@ const MEAL_LABELS: Record<string, string> = {
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   registrations,
   onUpdateRegistration,
-  onSendETicket,
   onLogout,
 }) => {
   const [showAddPayment, setShowAddPayment] = useState<string | null>(null);
   const [partialAmount, setPartialAmount] = useState('');
   const [viewReceipt, setViewReceipt] = useState<string | null>(null);
   const [viewTicket, setViewTicket] = useState<RegistrationData | null>(null);
-  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [approvingPayment, setApprovingPayment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
@@ -70,11 +68,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleSendETicket = (id: string) => {
-    setSendingEmail(id);
-    onSendETicket(id);
-    setTimeout(() => setSendingEmail(null), 1000);
-  };
+ [{
+	"resource": "/Users/apple/my-web-app/src/components/AdminDashboard.tsx",
+	"owner": "typescript",
+	"code": "6133",
+	"severity": 4,
+	"message": "'handleSendETicket' is declared but its value is never read.",
+	"source": "ts",
+	"startLineNumber": 72,
+	"startColumn": 9,
+	"endLineNumber": 72,
+	"endColumn": 26,
+	"tags": [
+		1
+	],
+	"origin": "extHost1"
+},{
+	"resource": "/Users/apple/my-web-app/src/components/AdminDashboard.tsx",
+	"owner": "typescript",
+	"code": "2304",
+	"severity": 8,
+	"message": "Cannot find name 'setSendingEmail'.",
+	"source": "ts",
+	"startLineNumber": 75,
+	"startColumn": 22,
+	"endLineNumber": 75,
+	"endColumn": 37,
+	"origin": "extHost1"
+},{
+	"resource": "/Users/apple/my-web-app/src/components/AdminDashboard.tsx",
+	"owner": "typescript",
+	"code": "2304",
+	"severity": 8,
+	"message": "Cannot find name 'setSendingEmail'.",
+	"source": "ts",
+	"startLineNumber": 73,
+	"startColumn": 5,
+	"endLineNumber": 73,
+	"endColumn": 20,
+	"origin": "extHost1"
+}]
 
   const handleAddPartialPayment = async (reg: RegistrationData) => {
     try {

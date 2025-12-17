@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { sendTicketEmail } from '../services/emailService';
-import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
+import { isValidPhoneNumber } from 'libphonenumber-js';
 
 export interface RegistrationData {
   id: string;
@@ -91,21 +91,6 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
       }
     } catch (error) {
       return false;
-    }
-  };
-
-  const formatPhoneForDisplay = (phone: string): string => {
-    try {
-      if (phone.startsWith('+')) {
-        const phoneNumber = parsePhoneNumber(phone);
-        return phoneNumber.formatInternational();
-      } else if (phone.startsWith('0')) {
-        const phoneNumber = parsePhoneNumber(phone, 'NG');
-        return phoneNumber.formatInternational();
-      }
-      return phone;
-    } catch (error) {
-      return phone;
     }
   };
 
