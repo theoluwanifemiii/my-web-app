@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { QrCode } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner';
 import type { RegistrationData } from './RegistrationPage';
 
 interface QRScannerPageProps {
@@ -13,6 +14,25 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
   const [scanResult, setScanResult] = useState<RegistrationData | null>(null);
   const [manualId, setManualId] = useState('');
   const [error, setError] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleScan = (detectedCodes: IDetectedBarcode[]) => {
+    const code = detectedCodes[0];
+    if (!code) return;
+
+    const reg = registrations.find(r => r.id === code.rawValue.trim());
+    if (!reg) {
+      setError('Ticket ID not found');
+      return;
+    }
+    if (reg.balance > 0) {
+      setError('Payment incomplete. Balance: ₦' + reg.balance.toLocaleString());
+      return;
+    }
+    setScanResult(reg);
+    setError('');
+    setIsScanning(false);
+  };
 
   const handleManualSearch = () => {
     const reg = registrations.find(r => r.id === manualId.trim());
@@ -44,11 +64,17 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
         <QrCode /> QR Scanner
       </h2>
 
-      {!scanResult && (
+      {!scanResult && !isScanning && (
         <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+          <button
+            onClick={() => setIsScanning(true)}
+            className="bg-purple-600 text-white px-4 py-3 rounded-xl w-full mb-4 hover:bg-purple-700 transition font-medium flex items-center justify-center gap-2"
+          >
+            <QrCode /> Start Scanning
+          </button>
           <input
             type="text"
-            placeholder="Enter Ticket ID manually"
+            placeholder="Or Enter Ticket ID manually"
             value={manualId}
             onChange={(e) => setManualId(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleManualSearch()}
@@ -67,6 +93,25 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
             Back to Dashboard
           </Link>
           {error && <p className="text-red-500 mt-3 text-sm">{error}</p>}
+        </div>
+      )}
+
+      {isScanning && (
+        <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+          <Scanner
+            onScan={handleScan}
+            onError={(error: unknown) => {
+              if (error instanceof Error) {
+                console.log(error.message);
+              }
+            }}
+          />
+          <button
+            onClick={() => setIsScanning(false)}
+            className="mt-4 bg-gray-300 px-4 py-3 rounded-xl w-full hover:bg-gray-400 transition font-medium"
+          >
+            Cancel
+          </button>
         </div>
       )}
 

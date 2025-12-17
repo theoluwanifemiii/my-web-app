@@ -1,3 +1,5 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
 // CORS + existing send-event-ticket logic
 const allowedOrigin = 'https://thanksgivingdinner.vercel.app';
 const allowCredentials = false; // set to true only if you need credentialed requests
@@ -49,7 +51,7 @@ Deno.serve(async (req: Request) => {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'no-reply@example.com',
+        from: 't-dinner@resend.dev',
         to: email,
         subject: `Your ticket, ${firstName}`,
         html: `<p>Hello ${firstName} ${lastName},</p><p>Here is your ticket.</p>`,

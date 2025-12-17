@@ -111,7 +111,7 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
     }
 
     if (!validatePhone(formData.phone)) {
-      setError('Please enter a valid phone number with country code (e.g., +2348012345678, +1234567890, +447911123456)');
+      setError('Please enter a valid phone number');
       return;
     }
 
