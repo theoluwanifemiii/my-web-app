@@ -563,7 +563,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="border-2 border-dashed border-purple-300 rounded-lg p-6 bg-gradient-to-br from-purple-50 to-blue-50">
                 <div className="text-center mb-4">
                   <h4 className="text-2xl font-bold text-gray-800 mb-2">Thanksgiving Dinner</h4>
-                  <p className="text-gray-600">Dec 31, 2024 • 7:00 PM</p>
+                  <p className="text-gray-600">Dec 22nd, 2025 • 4:00 PM</p>
                 </div>
                 <div className="bg-white rounded-lg p-4 mb-4">
                   <div className="grid grid-cols-2 gap-3 text-sm">
