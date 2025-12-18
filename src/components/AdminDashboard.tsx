@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, LogOut, QrCode, Search, Filter, X, Eye, Check, DollarSign, ChevronDown } from 'lucide-react';
+import {
+  Download,
+  LogOut,
+  QrCode,
+  Search,
+  Filter,
+  X,
+  Eye,
+  Check,
+  DollarSign,
+} from "lucide-react";
 import type { RegistrationData } from './RegistrationPage';
 
 interface AdminDashboardProps {
+
   registrations: RegistrationData[];
   onUpdateRegistration: (id: string, updates: Partial<RegistrationData>) => void;
   onSendETicket: (id: string) => void;
