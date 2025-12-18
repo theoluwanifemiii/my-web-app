@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+/// <reference types="https://esm.sh/@supabase/functions-js@2.4.1/src/edge-runtime.d.ts" />
 
 // CORS + existing send-event-ticket logic
 const allowedOrigin = 'https://thanksgivingdinner.vercel.app';
