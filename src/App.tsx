@@ -87,7 +87,6 @@ function App() {
   }) => {
     try {
       console.log('Attempting to save:', registration);
-<<<<<<< HEAD
       
       // ✅ FIX: Generate ticket QR for cash payments with full amount
       let ticketQR = registration.ticketQR;
@@ -105,9 +104,7 @@ function App() {
         console.log('Generated ticket QR for cash payment:', ticketQR);
       }
       
-=======
 
->>>>>>> Staging
       const { data, error } = await supabase
         .from('registrations')
         .insert({
@@ -126,16 +123,14 @@ function App() {
           total_paid: 0,
           balance: registration.totalDue,
           payment_method: registration.paymentMethod,
-<<<<<<< HEAD
           status: registration.status,
           transaction_ref: registration.transactionRef,
           receiver_name: registration.receiverName,
           receipt_image: registration.receiptImage,
           ticket_qr: ticketQR,  // ✅ FIX: Now saving ticket_qr
           ticket_generated: ticketGenerated,  // ✅ FIX: Now saving ticket_generated
-=======
           status: 'pending',
->>>>>>> Staging
+
           created_at: registration.createdAt,
         })
         .select();

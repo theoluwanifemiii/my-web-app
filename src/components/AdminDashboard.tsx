@@ -38,11 +38,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const [selectedReg, setSelectedReg] = useState<RegistrationData | null>(null);
   const [showAddPayment, setShowAddPayment] = useState(false);
-<<<<<<< HEAD
   const [showTicket, setShowTicket] = useState(false);
-=======
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
->>>>>>> Staging
   const [partialAmount, setPartialAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
   const [receiverName, setReceiverName] = useState('');
@@ -613,7 +610,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-<<<<<<< HEAD
       {/* Ticket Modal */}
       {showTicket && selectedReg && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={() => setShowTicket(false)}>
@@ -715,8 +711,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* Add Payment Modal */}
-=======
->>>>>>> Staging
       {showAddPayment && selectedReg && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
