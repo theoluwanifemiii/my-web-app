@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Download,
@@ -10,8 +10,11 @@ import {
   Eye,
   Check,
   DollarSign,
+  History,
 } from "lucide-react";
 import type { RegistrationData } from './RegistrationPage';
+import { getPaymentHistory, approvePayment, addPayment, type Payment } from '../services/paymentService';
+import { supabase } from '../lib/supabase';
 
 interface AdminDashboardProps {
   registrations: RegistrationData[];
@@ -31,81 +34,143 @@ const MEAL_LABELS: Record<string, string> = {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   registrations,
-  onUpdateRegistration,
   onLogout,
 }) => {
   const [selectedReg, setSelectedReg] = useState<RegistrationData | null>(null);
   const [showAddPayment, setShowAddPayment] = useState(false);
+<<<<<<< HEAD
   const [showTicket, setShowTicket] = useState(false);
+=======
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+>>>>>>> Staging
   const [partialAmount, setPartialAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
+  const [receiverName, setReceiverName] = useState('');
+  const [transactionRef, setTransactionRef] = useState('');
   const [viewReceipt, setViewReceipt] = useState<string | null>(null);
   const [approvingPayment, setApprovingPayment] = useState<string | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (selectedReg && showPaymentHistory) {
+      loadPaymentHistory(selectedReg.id);
+    }
+  }, [selectedReg, showPaymentHistory]);
+
+  const loadPaymentHistory = async (registrationId: string) => {
+    const history = await getPaymentHistory(registrationId);
+    setPaymentHistory(history);
+  };
 
   const handleApprove = async (reg: RegistrationData) => {
     try {
-      const qrData = JSON.stringify({
-        id: reg.id,
-        name: reg.name,
-        ticketType: reg.ticketType,
-        guestName: reg.guestName,
-      });
-      const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-
       setApprovingPayment(reg.id);
-      
-      await onUpdateRegistration(reg.id, {
-        status: 'paid',
-        totalPaid: reg.totalDue,
-        balance: 0,
-        ticketQR: qrCode,
-        ticketGenerated: true,
-      });
+      setError('');
+
+      const { data: pendingPayments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('registration_id', reg.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
+
+      if (!pendingPayments || pendingPayments.length === 0) {
+        setError('No pending payments to approve');
+        setApprovingPayment(null);
+        return;
+      }
+
+      const payment = pendingPayments[0];
+
+      const result = await approvePayment(payment.id, reg.id, 'Admin');
+
+      if (!result.success) {
+        setError(result.error || 'Failed to approve payment');
+        setApprovingPayment(null);
+        return;
+      }
+
+      const { data: updatedReg } = await supabase
+        .from('registrations')
+        .select('*')
+        .eq('id', reg.id)
+        .single();
+
+      if (updatedReg && updatedReg.balance <= 0 && !updatedReg.ticket_qr) {
+        const qrData = JSON.stringify({
+          id: reg.id,
+          name: reg.name,
+          ticketType: reg.ticketType,
+          guestName: reg.guestName,
+        });
+        const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+
+        await supabase
+          .from('registrations')
+          .update({
+            ticket_qr: qrCode,
+            ticket_generated: true,
+          })
+          .eq('id', reg.id);
+      }
 
       setApprovingPayment(null);
+      setSelectedReg(null);
     } catch (error) {
       console.error('Error approving payment:', error);
+      setError('Failed to approve payment');
       setApprovingPayment(null);
     }
   };
 
-  const handleAddPartialPayment = (reg: RegistrationData) => {
+  const handleAddPartialPayment = async () => {
+    if (!selectedReg) return;
+
     const amount = parseFloat(partialAmount);
-    if (isNaN(amount) || amount <= 0) return;
+    if (isNaN(amount) || amount <= 0) {
+      setError('Please enter a valid amount');
+      return;
+    }
 
-    const newTotalPaid = reg.totalPaid + amount;
-    const newBalance = reg.totalDue - newTotalPaid;
+    if (amount > selectedReg.balance) {
+      setError(`Amount cannot exceed balance of ₦${selectedReg.balance.toLocaleString()}`);
+      return;
+    }
 
-    if (newBalance <= 0) {
-      const qrData = JSON.stringify({
-        id: reg.id,
-        name: reg.name,
-        ticketType: reg.ticketType,
-        guestName: reg.guestName,
-      });
-      const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-      
-      onUpdateRegistration(reg.id, {
-        totalPaid: newTotalPaid,
-        balance: 0,
-        status: 'paid',
-        ticketQR: qrCode,
-        ticketGenerated: true,
-      });
-    } else {
-      onUpdateRegistration(reg.id, {
-        totalPaid: newTotalPaid,
-        balance: newBalance,
-        status: 'pending',
-      });
+    if (paymentMethod === 'cash' && !receiverName.trim()) {
+      setError('Please enter receiver name');
+      return;
+    }
+
+    if (paymentMethod === 'transfer' && !transactionRef.trim()) {
+      setError('Please enter transaction reference');
+      return;
+    }
+
+    const result = await addPayment({
+      registrationId: selectedReg.id,
+      amount,
+      paymentMethod,
+      receiverName: paymentMethod === 'cash' ? receiverName : undefined,
+      transactionRef: paymentMethod === 'transfer' ? transactionRef : undefined,
+    });
+
+    if (!result.success) {
+      setError(result.error || 'Failed to add payment');
+      return;
     }
 
     setShowAddPayment(false);
     setPartialAmount('');
+    setReceiverName('');
+    setTransactionRef('');
+    setError('');
     setSelectedReg(null);
   };
 
@@ -150,7 +215,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const filteredRegistrations = registrations.filter((reg) => {
     const query = searchQuery.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       reg.name.toLowerCase().includes(query) ||
       reg.email.toLowerCase().includes(query) ||
       reg.phone.toLowerCase().includes(query) ||
@@ -171,7 +236,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -186,7 +250,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
               <div className="text-sm text-green-700 font-medium">Total Revenue</div>
@@ -202,7 +265,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Search & Filter Bar */}
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -229,7 +291,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
 
-          {/* Filter Panel */}
           {showFilters && (
             <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="flex items-center justify-between mb-3">
@@ -290,7 +351,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Table */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -319,7 +379,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="font-medium text-gray-900">{reg.name}</div>
                         {reg.ticketType === 'group' && reg.groupSize && (
                           <div className="text-xs text-purple-600 font-medium mt-0.5">
-                            👥 Group of {reg.groupSize}
+                            Group of {reg.groupSize}
                           </div>
                         )}
                         {reg.guestName && (
@@ -346,22 +406,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             ? 'bg-green-100 text-green-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {reg.status === 'paid' ? '✓ Paid' : '⏳ Pending'}
+                          {reg.status === 'paid' ? 'Paid' : 'Pending'}
                         </span>
                         <div className="text-xs text-gray-500 mt-1">
-                          {reg.paymentMethod === 'cash' ? '💵' : '🏦'}
+                          {reg.paymentMethod === 'cash' ? 'Cash' : 'Transfer'}
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() => setSelectedReg(reg)}
+                            onClick={() => {
+                              setSelectedReg(reg);
+                              setShowPaymentHistory(false);
+                              setShowAddPayment(false);
+                            }}
                             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          
+
                           {reg.status === 'pending' && reg.paymentMethod === 'transfer' && (
                             <button
                               onClick={() => handleApprove(reg)}
@@ -372,12 +436,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <Check className="w-4 h-4" />
                             </button>
                           )}
-                          
+
                           {reg.balance > 0 && (
                             <button
                               onClick={() => {
                                 setSelectedReg(reg);
                                 setShowAddPayment(true);
+                                setShowPaymentHistory(false);
                               }}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                               title="Add Payment"
@@ -385,6 +450,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <DollarSign className="w-4 h-4" />
                             </button>
                           )}
+
+                          <button
+                            onClick={() => {
+                              setSelectedReg(reg);
+                              setShowPaymentHistory(true);
+                              setShowAddPayment(false);
+                            }}
+                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition"
+                            title="Payment History"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -396,8 +473,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Details Modal */}
-      {selectedReg && !showAddPayment && (
+      {selectedReg && !showAddPayment && !showPaymentHistory && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedReg(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -408,7 +484,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Personal Info */}
               <div>
                 <h4 className="font-semibold text-gray-900 mb-3">Personal Information</h4>
                 <div className="grid grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4">
@@ -439,7 +514,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Group Members */}
               {selectedReg.additionalAttendees && selectedReg.additionalAttendees.length > 0 && (
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-3">Group Members ({selectedReg.groupSize} total)</h4>
@@ -454,7 +528,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               )}
 
-              {/* Payment Info */}
               <div>
                 <h4 className="font-semibold text-gray-900 mb-3">Payment Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -474,7 +547,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   )}
                   <div className="flex justify-between pt-2 border-t border-gray-200">
                     <span className="text-gray-600">Method:</span>
-                    <span className="font-medium">{selectedReg.paymentMethod === 'cash' ? '💵 Cash' : '🏦 Transfer'}</span>
+                    <span className="font-medium">{selectedReg.paymentMethod === 'cash' ? 'Cash' : 'Transfer'}</span>
                   </div>
                   {selectedReg.receiverName && (
                     <div className="flex justify-between">
@@ -491,13 +564,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Actions */}
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-red-600 text-sm">{error}</p>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 {selectedReg.status === 'pending' && selectedReg.paymentMethod === 'transfer' && (
                   <button
                     onClick={() => {
                       handleApprove(selectedReg);
-                      setSelectedReg(null);
                     }}
                     disabled={approvingPayment === selectedReg.id}
                     className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
@@ -521,12 +598,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     View Ticket
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    setShowPaymentHistory(true);
+                  }}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center justify-center gap-2"
+                >
+                  <History className="w-4 h-4" />
+                  Payment History
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
+<<<<<<< HEAD
       {/* Ticket Modal */}
       {showTicket && selectedReg && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={() => setShowTicket(false)}>
@@ -628,35 +715,86 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* Add Payment Modal */}
+=======
+>>>>>>> Staging
       {showAddPayment && selectedReg && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
             <h3 className="text-lg font-bold mb-4">Add Payment</h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-              <input
-                type="number"
-                value={partialAmount}
-                onChange={(e) => setPartialAmount(e.target.value)}
-                placeholder="Enter amount"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <div className="text-sm text-gray-500 mt-1">
-                Balance: ₦{selectedReg.balance.toLocaleString()}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                <input
+                  type="number"
+                  value={partialAmount}
+                  onChange={(e) => setPartialAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <div className="text-sm text-gray-500 mt-1">
+                  Balance: ₦{selectedReg.balance.toLocaleString()}
+                </div>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as 'cash' | 'transfer')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="transfer">Bank Transfer</option>
+                </select>
+              </div>
+
+              {paymentMethod === 'cash' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Receiver Name</label>
+                  <input
+                    type="text"
+                    value={receiverName}
+                    onChange={(e) => setReceiverName(e.target.value)}
+                    placeholder="Name of person receiving payment"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              {paymentMethod === 'transfer' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Reference</label>
+                  <input
+                    type="text"
+                    value={transactionRef}
+                    onChange={(e) => setTransactionRef(e.target.value)}
+                    placeholder="Transaction reference"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-red-600 text-sm">{error}</p>
+                </div>
+              )}
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 mt-6">
               <button
                 onClick={() => {
                   setShowAddPayment(false);
                   setPartialAmount('');
+                  setReceiverName('');
+                  setTransactionRef('');
+                  setError('');
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleAddPartialPayment(selectedReg)}
+                onClick={handleAddPartialPayment}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
                 Add Payment
@@ -666,7 +804,82 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* Receipt Modal */}
+      {showPaymentHistory && selectedReg && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setShowPaymentHistory(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-900">Payment History - {selectedReg.name}</h3>
+              <button onClick={() => setShowPaymentHistory(false)} className="p-2 hover:bg-gray-100 rounded-lg transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {paymentHistory.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  No payment history found
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paymentHistory.map((payment) => (
+                    <div key={payment.id} className={`p-4 rounded-lg border ${
+                      payment.status === 'approved' ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+                    }`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="font-semibold text-lg">₦{payment.amount.toLocaleString()}</div>
+                          <div className="text-sm text-gray-600">
+                            {payment.payment_method === 'cash' ? 'Cash Payment' : 'Bank Transfer'}
+                          </div>
+                        </div>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          payment.status === 'approved'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {payment.status === 'approved' ? 'Approved' : 'Pending'}
+                        </span>
+                      </div>
+
+                      {payment.receiver_name && (
+                        <div className="text-sm text-gray-600">
+                          Received by: {payment.receiver_name}
+                        </div>
+                      )}
+
+                      {payment.transaction_ref && (
+                        <div className="text-sm text-gray-600">
+                          Reference: {payment.transaction_ref}
+                        </div>
+                      )}
+
+                      {payment.approved_by && (
+                        <div className="text-sm text-gray-600">
+                          Approved by: {payment.approved_by}
+                        </div>
+                      )}
+
+                      <div className="text-xs text-gray-500 mt-2">
+                        {new Date(payment.created_at).toLocaleString()}
+                      </div>
+
+                      {payment.receipt_image && (
+                        <button
+                          onClick={() => setViewReceipt(payment.receipt_image!)}
+                          className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                        >
+                          View Receipt
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {viewReceipt && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={() => setViewReceipt(null)}>
           <div className="bg-white rounded-lg p-4 max-w-2xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>

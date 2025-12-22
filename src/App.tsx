@@ -78,9 +78,16 @@ function App() {
     }
   };
 
-  const handleAddRegistration = async (registration: RegistrationData) => {
+  const handleAddRegistration = async (registration: RegistrationData, paymentData?: {
+    amount: number;
+    paymentMethod: 'cash' | 'transfer';
+    transactionRef?: string;
+    receiverName?: string;
+    receiptImage?: string;
+  }) => {
     try {
       console.log('Attempting to save:', registration);
+<<<<<<< HEAD
       
       // ✅ FIX: Generate ticket QR for cash payments with full amount
       let ticketQR = registration.ticketQR;
@@ -98,6 +105,9 @@ function App() {
         console.log('Generated ticket QR for cash payment:', ticketQR);
       }
       
+=======
+
+>>>>>>> Staging
       const { data, error } = await supabase
         .from('registrations')
         .insert({
@@ -113,15 +123,19 @@ function App() {
           additional_attendees: registration.additionalAttendees,
           meal_choice: registration.mealChoice,
           total_due: registration.totalDue,
-          total_paid: registration.totalPaid,
-          balance: registration.balance,
+          total_paid: 0,
+          balance: registration.totalDue,
           payment_method: registration.paymentMethod,
+<<<<<<< HEAD
           status: registration.status,
           transaction_ref: registration.transactionRef,
           receiver_name: registration.receiverName,
           receipt_image: registration.receiptImage,
           ticket_qr: ticketQR,  // ✅ FIX: Now saving ticket_qr
           ticket_generated: ticketGenerated,  // ✅ FIX: Now saving ticket_generated
+=======
+          status: 'pending',
+>>>>>>> Staging
           created_at: registration.createdAt,
         })
         .select();
@@ -130,9 +144,34 @@ function App() {
         console.error('Supabase error:', error);
         throw error;
       }
-      
-      console.log('Successfully saved:', data);
-      
+
+      console.log('Successfully saved registration:', data);
+
+      if (paymentData && paymentData.amount > 0) {
+        const paymentStatus = paymentData.paymentMethod === 'cash' ? 'approved' : 'pending';
+
+        const { error: paymentError } = await supabase
+          .from('payments')
+          .insert({
+            registration_id: registration.id,
+            amount: paymentData.amount,
+            payment_method: paymentData.paymentMethod,
+            transaction_ref: paymentData.transactionRef,
+            receiver_name: paymentData.receiverName,
+            receipt_image: paymentData.receiptImage,
+            status: paymentStatus,
+            approved_by: paymentData.paymentMethod === 'cash' ? paymentData.receiverName : null,
+            approved_at: paymentData.paymentMethod === 'cash' ? new Date().toISOString() : null,
+          });
+
+        if (paymentError) {
+          console.error('Payment record error:', paymentError);
+          throw paymentError;
+        }
+
+        console.log('Payment record created');
+      }
+
       await loadRegistrations();
     } catch (error) {
       console.error('Error adding registration:', error);

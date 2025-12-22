@@ -30,7 +30,13 @@ export interface RegistrationData {
 }
 
 interface RegistrationPageProps {
-  onRegister: (registration: RegistrationData) => void;
+  onRegister: (registration: RegistrationData, paymentData?: {
+    amount: number;
+    paymentMethod: 'cash' | 'transfer';
+    transactionRef?: string;
+    receiverName?: string;
+    receiptImage?: string;
+  }) => void;
 }
 
 const MEAL_OPTIONS = [
@@ -216,7 +222,6 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
     }
 
     const paidAmount = parseFloat(amountPaid);
-    const balance = ticketPrice - paidAmount;
 
     const registration: RegistrationData = {
       id: Date.now().toString(),
@@ -231,17 +236,22 @@ export default function RegistrationPage({ onRegister }: RegistrationPageProps) 
       additionalAttendees: formData.ticketType === 'group' ? formData.additionalAttendees : undefined,
       mealChoice: formData.mealChoice,
       totalDue: ticketPrice,
-      totalPaid: paidAmount,
-      balance: balance,
+      totalPaid: 0,
+      balance: ticketPrice,
       paymentMethod,
-      status: balance <= 0 ? 'paid' : 'pending',
-      transactionRef: paymentMethod === 'transfer' ? transactionRef.trim() : undefined,
-      receiverName: paymentMethod === 'cash' ? receiverName.trim() : undefined,
-      receiptImage: paymentMethod === 'transfer' ? receiptImage : undefined,
+      status: 'pending',
       createdAt: new Date().toISOString(),
     };
 
-    onRegister(registration);
+    const paymentData = {
+      amount: paidAmount,
+      paymentMethod,
+      transactionRef: paymentMethod === 'transfer' ? transactionRef.trim() : undefined,
+      receiverName: paymentMethod === 'cash' ? receiverName.trim() : undefined,
+      receiptImage: paymentMethod === 'transfer' && receiptImage ? receiptImage : undefined,
+    };
+
+    onRegister(registration, paymentData);
 
     try {
       await sendTicketEmail({
