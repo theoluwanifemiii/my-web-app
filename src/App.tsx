@@ -4,6 +4,7 @@ import RegistrationPage, { type RegistrationData } from './components/Registrati
 import AdminDashboard from './components/AdminDashboard';
 import QRScannerPage from './components/QRScannerPage';
 import AdminLogin from './components/AdminLogin';
+import CheckInSheet from './components/CheckInSheet';
 import { supabase } from './lib/supabase';
 
 function App() {
@@ -240,6 +241,17 @@ function App() {
                 onUpdateRegistration={handleUpdateRegistration}
                 onBack={() => {}}
               />
+            ) : (
+              <Navigate to="/admin" replace />
+            )
+          } 
+        />
+
+        <Route 
+          path="/admin/checkin-sheet" 
+          element={
+            isAdmin ? (
+              <CheckInSheet registrations={registrations} />
             ) : (
               <Navigate to="/admin" replace />
             )

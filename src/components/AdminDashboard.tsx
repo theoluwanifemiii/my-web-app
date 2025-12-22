@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+
 import {
   Download,
   LogOut,
@@ -11,6 +12,7 @@ import {
   Check,
   DollarSign,
   History,
+  Users,
 } from "lucide-react";
 import type { RegistrationData } from './RegistrationPage';
 import { getPaymentHistory, approvePayment, addPayment, type Payment } from '../services/paymentService';
@@ -238,6 +240,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
             <div className="flex gap-2">
+               <Link to="/admin/checkin-sheet" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+    <Users className="w-4 h-4" />Check-In
+  </Link>
               <Link to="/admin/scanner" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2">
                 <QrCode className="w-4 h-4" />Scanner
               </Link>
@@ -246,6 +251,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
           </div>
+        
 
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
