@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { QrCode, Search, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { QrCode, Search, X, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner';
 import type { RegistrationData } from './RegistrationPage';
-
 
 interface QRScannerPageProps {
   registrations: RegistrationData[];
@@ -18,6 +17,7 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
   const [error, setError] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [success, setSuccess] = useState('');
+  const [showBalanceWarning, setShowBalanceWarning] = useState(false);
 
   const handleScan = (detectedCodes: IDetectedBarcode[]) => {
     const code = detectedCodes[0];
@@ -28,13 +28,15 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
       setError('Ticket ID not found');
       return;
     }
-    if (reg.balance > 0) {
-      setError('Payment incomplete. Balance: ₦' + reg.balance.toLocaleString());
-      return;
-    }
+    
     setScanResult(reg);
     setError('');
     setIsScanning(false);
+    
+    // Show warning if there's a balance
+    if (reg.balance > 0) {
+      setShowBalanceWarning(true);
+    }
   };
 
   const handleManualSearch = () => {
@@ -64,26 +66,33 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
   };
 
   const handleSelectResult = (reg: RegistrationData) => {
-    if (reg.balance > 0) {
-      setError('Payment incomplete. Balance: ₦' + reg.balance.toLocaleString());
-      return;
-    }
     setScanResult(reg);
     setSearchResults([]);
     setManualSearch('');
     setError('');
+    
+    // Show warning if there's a balance
+    if (reg.balance > 0) {
+      setShowBalanceWarning(true);
+    }
   };
 
   const handleCheckIn = () => {
     if (scanResult) {
       onUpdateRegistration(scanResult.id, { checkedIn: true });
-      setSuccess(`✓ ${scanResult.name} checked in successfully!`);
+      
+      if (scanResult.balance > 0) {
+        setSuccess(`✓ ${scanResult.name} checked in with ₦${scanResult.balance.toLocaleString()} balance remaining`);
+      } else {
+        setSuccess(`✓ ${scanResult.name} checked in successfully!`);
+      }
       
       setTimeout(() => {
         setScanResult(null);
         setManualSearch('');
         setSuccess('');
-      }, 2000);
+        setShowBalanceWarning(false);
+      }, 2500);
     }
   };
 
@@ -203,7 +212,7 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
                   </div>
                   <div className="text-right">
                     {reg.balance > 0 ? (
-                      <span className="inline-block px-2.5 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
+                      <span className="inline-block px-2.5 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
                         ₦{reg.balance.toLocaleString()} Due
                       </span>
                     ) : reg.checkedIn ? (
@@ -246,16 +255,36 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
         <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center">
           <div className="mb-4">
             <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-              scanResult.checkedIn ? 'bg-green-100' : 'bg-blue-100'
+              scanResult.checkedIn ? 'bg-green-100' : scanResult.balance > 0 ? 'bg-yellow-100' : 'bg-blue-100'
             }`}>
               {scanResult.checkedIn ? (
                 <CheckCircle className="w-10 h-10 text-green-600" />
+              ) : scanResult.balance > 0 ? (
+                <AlertTriangle className="w-10 h-10 text-yellow-600" />
               ) : (
                 <QrCode className="w-10 h-10 text-blue-600" />
               )}
             </div>
             <h3 className="text-2xl font-bold mb-2">{scanResult.name}</h3>
           </div>
+
+          {/* Balance Warning */}
+          {scanResult.balance > 0 && showBalanceWarning && !scanResult.checkedIn && (
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-left">
+                  <h4 className="font-bold text-yellow-900 mb-1">Outstanding Balance</h4>
+                  <p className="text-sm text-yellow-800 mb-2">
+                    This attendee has an outstanding balance of <span className="font-bold">₦{scanResult.balance.toLocaleString()}</span>
+                  </p>
+                  <p className="text-xs text-yellow-700">
+                    You can still check them in, but please note the balance.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="bg-gray-50 rounded-xl p-4 mb-4 text-left space-y-2">
             <p className="text-sm">
@@ -272,12 +301,21 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
               {scanResult.guestName && ` + ${scanResult.guestName}`}
               {scanResult.groupSize && ` (Group of ${scanResult.groupSize})`}
             </p>
-            <p className="text-sm">
-              <span className="font-medium text-gray-700">Payment Status:</span>{' '}
-              <span className={scanResult.balance === 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                {scanResult.balance === 0 ? '✓ Fully Paid' : `₦${scanResult.balance.toLocaleString()} Balance`}
-              </span>
-            </p>
+            <div className="pt-2 border-t border-gray-200">
+              <p className="text-sm">
+                <span className="font-medium text-gray-700">Total Due:</span> ₦{scanResult.totalDue.toLocaleString()}
+              </p>
+              <p className="text-sm">
+                <span className="font-medium text-gray-700">Paid:</span>{' '}
+                <span className="text-green-600 font-medium">₦{scanResult.totalPaid.toLocaleString()}</span>
+              </p>
+              {scanResult.balance > 0 && (
+                <p className="text-sm">
+                  <span className="font-medium text-gray-700">Balance:</span>{' '}
+                  <span className="text-yellow-600 font-bold">₦{scanResult.balance.toLocaleString()}</span>
+                </p>
+              )}
+            </div>
           </div>
 
           {scanResult.checkedIn ? (
@@ -288,9 +326,13 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
           ) : (
             <button
               onClick={handleCheckIn}
-              className="bg-green-600 text-white px-4 py-3 rounded-xl w-full mb-2 hover:bg-green-700 transition font-medium text-lg"
+              className={`${
+                scanResult.balance > 0 
+                  ? 'bg-yellow-600 hover:bg-yellow-700' 
+                  : 'bg-green-600 hover:bg-green-700'
+              } text-white px-4 py-3 rounded-xl w-full mb-2 transition font-medium text-lg`}
             >
-              Check In Now
+              {scanResult.balance > 0 ? 'Check In (With Balance)' : 'Check In Now'}
             </button>
           )}
           
@@ -299,6 +341,7 @@ export default function QRScannerPage({ registrations, onUpdateRegistration }: Q
               setScanResult(null); 
               setManualSearch(''); 
               setError(''); 
+              setShowBalanceWarning(false);
             }}
             className="bg-gray-300 px-4 py-3 rounded-xl w-full hover:bg-gray-400 transition font-medium"
           >
