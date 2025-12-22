@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Scanner, type IDetectedBarcode } from '@yudiel/react-qr-scanner';
 import type { RegistrationData } from './RegistrationPage';
 
+
 interface QRScannerPageProps {
   registrations: RegistrationData[];
   onUpdateRegistration: (id: string, updates: Partial<RegistrationData>) => void;
