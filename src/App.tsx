@@ -82,6 +82,22 @@ function App() {
     try {
       console.log('Attempting to save:', registration);
       
+      // ✅ FIX: Generate ticket QR for cash payments with full amount
+      let ticketQR = registration.ticketQR;
+      let ticketGenerated = registration.ticketGenerated || false;
+      
+      if (registration.paymentMethod === 'cash' && registration.balance <= 0) {
+        const qrData = JSON.stringify({
+          id: registration.id,
+          name: registration.name,
+          ticketType: registration.ticketType,
+          guestName: registration.guestName,
+        });
+        ticketQR = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+        ticketGenerated = true;
+        console.log('Generated ticket QR for cash payment:', ticketQR);
+      }
+      
       const { data, error } = await supabase
         .from('registrations')
         .insert({
@@ -104,6 +120,8 @@ function App() {
           transaction_ref: registration.transactionRef,
           receiver_name: registration.receiverName,
           receipt_image: registration.receiptImage,
+          ticket_qr: ticketQR,  // ✅ FIX: Now saving ticket_qr
+          ticket_generated: ticketGenerated,  // ✅ FIX: Now saving ticket_generated
           created_at: registration.createdAt,
         })
         .select();

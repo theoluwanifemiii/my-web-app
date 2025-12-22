@@ -14,7 +14,6 @@ import {
 import type { RegistrationData } from './RegistrationPage';
 
 interface AdminDashboardProps {
-
   registrations: RegistrationData[];
   onUpdateRegistration: (id: string, updates: Partial<RegistrationData>) => void;
   onSendETicket: (id: string) => void;
@@ -37,6 +36,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const [selectedReg, setSelectedReg] = useState<RegistrationData | null>(null);
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [showTicket, setShowTicket] = useState(false);
   const [partialAmount, setPartialAmount] = useState('');
   const [viewReceipt, setViewReceipt] = useState<string | null>(null);
   const [approvingPayment, setApprovingPayment] = useState<string | null>(null);
@@ -515,13 +515,113 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
                 {selectedReg.ticketQR && (
                   <button
-                    onClick={() => window.open(selectedReg.ticketQR, '_blank')}
+                    onClick={() => setShowTicket(true)}
                     className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
                   >
                     View Ticket
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ticket Modal */}
+      {showTicket && selectedReg && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={() => setShowTicket(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <h3 className="text-xl font-bold">E-Ticket</h3>
+              <button onClick={() => setShowTicket(false)} className="p-1 hover:bg-white/20 rounded-lg transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <h4 className="text-2xl font-bold text-gray-900 mb-1">Thanksgiving Dinner 2024</h4>
+                <p className="text-gray-600">December 31, 2024 • 7:00 PM</p>
+              </div>
+
+              {/* Primary Attendee */}
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-4 mb-4 border-2 border-purple-200">
+                <div className="text-sm text-purple-600 font-medium mb-2">Primary Registrant</div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-gray-500 text-xs">Name</div>
+                    <div className="font-semibold text-gray-900">{selectedReg.name}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-xs">Church</div>
+                    <div className="font-semibold text-gray-900">{selectedReg.church}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-xs">Zone</div>
+                    <div className="font-semibold text-gray-900">{selectedReg.zone}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-xs">Meal</div>
+                    <div className="font-semibold text-gray-900 text-xs">
+                      {selectedReg.mealChoice ? MEAL_LABELS[selectedReg.mealChoice] : '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Guest or Group Members */}
+              {selectedReg.guestName && (
+                <div className="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-200">
+                  <div className="text-sm text-blue-600 font-medium mb-2">Guest</div>
+                  <div className="font-semibold text-gray-900">{selectedReg.guestName}</div>
+                </div>
+              )}
+
+              {selectedReg.additionalAttendees && selectedReg.additionalAttendees.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-sm text-gray-600 font-medium mb-2">
+                    Additional Attendees ({selectedReg.additionalAttendees.length})
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {selectedReg.additionalAttendees.map((attendee, index) => (
+                      <div key={index} className="bg-purple-50 rounded-lg p-3 border border-purple-100">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-purple-900 text-sm">
+                              {index + 2}. {attendee.name}
+                            </div>
+                            <div className="text-xs text-purple-700">
+                              {MEAL_LABELS[attendee.mealChoice] || attendee.mealChoice}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* QR Code */}
+              {selectedReg.ticketQR && (
+                <div className="text-center bg-white rounded-xl p-4 border-2 border-gray-200">
+                  <img
+                    src={selectedReg.ticketQR}
+                    alt="QR Code"
+                    className="w-48 h-48 mx-auto mb-3"
+                  />
+                  <p className="text-sm text-gray-600 mb-1">Scan at entrance</p>
+                  <p className="text-xs text-gray-500 font-mono">ID: {selectedReg.id}</p>
+                </div>
+              )}
+
+              {/* Total Attendees Summary */}
+              {selectedReg.ticketType === 'group' && selectedReg.groupSize && (
+                <div className="mt-4 bg-green-50 rounded-lg p-3 border border-green-200 text-center">
+                  <div className="text-sm text-green-700">
+                    <span className="font-semibold">Total Attendees: {selectedReg.groupSize}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
