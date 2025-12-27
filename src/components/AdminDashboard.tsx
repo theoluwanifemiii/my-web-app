@@ -119,6 +119,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       setApprovingPayment(null);
       setSelectedReg(null);
+      setShowTicket(false);
     } catch (error) {
       console.error('Error approving payment:', error);
       setError('Failed to approve payment');
@@ -167,8 +168,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setPartialAmount('');
     setReceiverName('');
     setTransactionRef('');
+    setPaymentMethod('cash');
     setError('');
     setSelectedReg(null);
+    setApprovingPayment(null);
   };
 
   const exportToCSV = () => {
@@ -470,12 +473,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {selectedReg && !showAddPayment && !showPaymentHistory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedReg(null)}>
+      {selectedReg && !showAddPayment && !showPaymentHistory && !showTicket && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => {
+          setSelectedReg(null);
+          setShowTicket(false);
+        }}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Registration Details</h3>
-              <button onClick={() => setSelectedReg(null)} className="p-2 hover:bg-gray-100 rounded-lg transition">
+              <button onClick={() => {
+                setSelectedReg(null);
+                setShowTicket(false);
+              }} className="p-2 hover:bg-gray-100 rounded-lg transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -783,15 +792,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   setTransactionRef('');
                   setError('');
                 }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                disabled={approvingPayment === selectedReg?.id}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddPartialPayment}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                disabled={approvingPayment === selectedReg?.id}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
-                Add Payment
+                {approvingPayment === selectedReg?.id ? 'Processing...' : 'Add Payment'}
               </button>
             </div>
           </div>
