@@ -37,19 +37,21 @@ export async function approvePayment(
   approverName: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { data: registration } = await supabase
-      .from('registrations')
-      .select('balance')
-      .eq('id', registrationId)
+    const { data: payment, error: fetchError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', paymentId)
       .single();
 
-    if (!registration) {
-      return { success: false, error: 'Registration not found' };
+    if (fetchError || !payment) {
+      return { success: false, error: 'Payment not found' };
     }
 
-    if (registration.balance <= 0) {
-      return { success: false, error: 'Payment already complete' };
+    if (payment.status === 'approved') {
+      return { success: false, error: 'Payment is already approved' };
     }
+
+    console.log('Approving payment:', paymentId, 'for registration:', registrationId);
 
     const { error } = await supabase
       .from('payments')
@@ -60,8 +62,12 @@ export async function approvePayment(
       })
       .eq('id', paymentId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase update error:', error);
+      throw error;
+    }
 
+    console.log('Payment approved successfully');
     return { success: true };
   } catch (error: any) {
     console.error('Error approving payment:', error);

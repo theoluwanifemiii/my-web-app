@@ -70,34 +70,60 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setApprovingPayment(reg.id);
       setError('');
 
-      const { data: pendingPayments } = await supabase
+      console.log('Fetching pending payments for registration:', reg.id);
+      const { data: pendingPayments, error: fetchError } = await supabase
         .from('payments')
         .select('*')
         .eq('registration_id', reg.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
+      console.log('Pending payments found:', pendingPayments, 'error:', fetchError);
+
+      if (fetchError) {
+        setError(`Database error: ${fetchError.message}`);
+        setApprovingPayment(null);
+        return;
+      }
+
       if (!pendingPayments || pendingPayments.length === 0) {
-        setError('No pending payments to approve');
+        const { data: allPayments } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('registration_id', reg.id);
+
+        console.log('All payments for this registration:', allPayments);
+        setError(`No pending payments to approve. Total payments: ${allPayments?.length || 0}`);
         setApprovingPayment(null);
         return;
       }
 
       const payment = pendingPayments[0];
+      console.log('Approving payment:', payment.id);
 
       const result = await approvePayment(payment.id, reg.id, 'Admin');
 
       if (!result.success) {
+        console.error('Approval failed:', result.error);
         setError(result.error || 'Failed to approve payment');
         setApprovingPayment(null);
         return;
       }
 
-      const { data: updatedReg } = await supabase
+      console.log('Payment approved, waiting for trigger...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const { data: updatedReg, error: regError } = await supabase
         .from('registrations')
         .select('*')
         .eq('id', reg.id)
         .single();
+
+      console.log('Updated registration:', updatedReg);
+
+      if (regError) {
+        console.error('Error fetching updated registration:', regError);
+      }
 
       if (updatedReg && updatedReg.balance <= 0 && !updatedReg.ticket_qr) {
         const qrData = JSON.stringify({
@@ -120,9 +146,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setApprovingPayment(null);
       setSelectedReg(null);
       setShowTicket(false);
+      alert('Payment approved successfully!');
     } catch (error) {
       console.error('Error approving payment:', error);
-      setError('Failed to approve payment');
+      setError(`Failed to approve payment: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setApprovingPayment(null);
     }
   };
